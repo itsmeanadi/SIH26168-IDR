@@ -1,0 +1,153 @@
+{
+  "num_scenarios_evaluated": 443,
+  "overall_summary": {
+    "Raw IMU Mechanization (Baseline)": {
+      "drift_pct_mean": 10.88,
+      "drift_pct_median": 9.13,
+      "drift_pct_p90": 19.86,
+      "drift_pct_worst": 61.83,
+      "cep50_m_median": 11.1,
+      "cep50_m_p90": 53.95,
+      "rmse_m_mean": 32.48,
+      "pass_rate_pct": 57.6
+    },
+    "EKF + AI-Velocity": {
+      "drift_pct_mean": 13.27,
+      "drift_pct_median": 9.24,
+      "drift_pct_p90": 29.38,
+      "drift_pct_worst": 66.47,
+      "cep50_m_median": 9.82,
+      "cep50_m_p90": 81.19,
+      "rmse_m_mean": 42.06,
+      "pass_rate_pct": 51.9
+    },
+    "EKF + AI-Velocity + NHC": {
+      "drift_pct_mean": 13.14,
+      "drift_pct_median": 9.21,
+      "drift_pct_p90": 29.06,
+      "drift_pct_worst": 65.49,
+      "cep50_m_median": 9.77,
+      "cep50_m_p90": 81.04,
+      "rmse_m_mean": 41.64,
+      "pass_rate_pct": 51.9
+    },
+    "EKF + AI-Velocity + NHC + OSM Snap": {
+      "drift_pct_mean": 8.52,
+      "drift_pct_median": 1.17,
+      "drift_pct_p90": 29.06,
+      "drift_pct_worst": 65.49,
+      "cep50_m_median": 3.56,
+      "cep50_m_p90": 75.76,
+      "rmse_m_mean": 39.4,
+      "pass_rate_pct": 72.9
+    },
+    "KalmanNet Neural Fusion + NHC": {
+      "drift_pct_mean": 13.14,
+      "drift_pct_median": 9.21,
+      "drift_pct_p90": 29.06,
+      "drift_pct_worst": 65.49,
+      "cep50_m_median": 9.77,
+      "cep50_m_p90": 81.04,
+      "rmse_m_mean": 41.64,
+      "pass_rate_pct": 51.9
+    }
+  },
+  "scenario_type_breakdown": {
+    "motorway_straight": {
+      "Raw IMU Mechanization (Baseline)": {
+        "count": 96,
+        "median_drift_pct": 7.7,
+        "p90_drift_pct": 14.99,
+        "pass_rate_pct": 72.9
+      },
+      "EKF + AI-Velocity": {
+        "count": 96,
+        "median_drift_pct": 6.48,
+        "p90_drift_pct": 12.92,
+        "pass_rate_pct": 71.9
+      },
+      "EKF + AI-Velocity + NHC": {
+        "count": 96,
+        "median_drift_pct": 6.46,
+        "p90_drift_pct": 12.83,
+        "pass_rate_pct": 71.9
+      },
+      "EKF + AI-Velocity + NHC + OSM Snap": {
+        "count": 96,
+        "median_drift_pct": 0.6,
+        "p90_drift_pct": 1.79,
+        "pass_rate_pct": 95.8
+      },
+      "KalmanNet Neural Fusion + NHC": {
+        "count": 96,
+        "median_drift_pct": 6.46,
+        "p90_drift_pct": 12.83,
+        "pass_rate_pct": 71.9
+      }
+    },
+    "high_noise_canyon": {
+      "Raw IMU Mechanization (Baseline)": {
+        "count": 100,
+        "median_drift_pct": 9.46,
+        "p90_drift_pct": 35.56,
+        "pass_rate_pct": 51.0
+      },
+      "EKF + AI-Velocity": {
+        "count": 100,
+        "median_drift_pct": 9.14,
+        "p90_drift_pct": 29.87,
+        "pass_rate_pct": 52.0
+      },
+      "EKF + AI-Velocity + NHC": {
+        "count": 100,
+        "median_drift_pct": 9.18,
+        "p90_drift_pct": 30.03,
+        "pass_rate_pct": 52.0
+      },
+      "EKF + AI-Velocity + NHC + OSM Snap": {
+        "count": 100,
+        "median_drift_pct": 1.36,
+        "p90_drift_pct": 30.03,
+        "pass_rate_pct": 73.0
+      },
+      "KalmanNet Neural Fusion + NHC": {
+        "count": 100,
+        "median_drift_pct": 9.18,
+        "p90_drift_pct": 30.03,
+        "pass_rate_pct": 52.0
+      }
+    },
+    "motorway_curve": {
+      "Raw IMU Mechanization (Baseline)": {
+        "count": 247,
+        "median_drift_pct": 9.53,
+        "p90_drift_pct": 19.7,
+        "pass_rate_pct": 54.3
+      },
+      "EKF + AI-Velocity": {
+        "count": 247,
+        "median_drift_pct": 13.22,
+        "p90_drift_pct": 33.29,
+        "pass_rate_pct": 44.1
+      },
+      "EKF + AI-Velocity + NHC": {
+        "count": 247,
+        "median_drift_pct": 13.17,
+        "p90_drift_pct": 33.01,
+        "pass_rate_pct": 44.1
+      },
+      "EKF + AI-Velocity + NHC + OSM Snap": {
+        "count": 247,
+        "median_drift_pct": 1.79,
+        "p90_drift_pct": 33.01,
+        "pass_rate_pct": 64.0
+      },
+      "KalmanNet Neural Fusion + NHC": {
+        "count": 247,
+        "median_drift_pct": 13.17,
+        "p90_drift_pct": 33.01,
+        "pass_rate_pct": 44.1
+      }
+    }
+  }
+}

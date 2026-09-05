@@ -1,0 +1,44 @@
+{
+  "Raw IMU Mechanization (Baseline)": {
+    "total_distance_m": 1153.11,
+    "final_drift_m": 31.21,
+    "drift_percent": 2.71,
+    "rmse_position_m": 12.69,
+    "cep_50_m": 7.67,
+    "drms_95_m": 26.09
+  },
+  "EKF + AI-Velocity": {
+    "total_distance_m": 1153.11,
+    "final_drift_m": 42.17,
+    "drift_percent": 3.66,
+    "rmse_position_m": 19.34,
+    "cep_50_m": 11.3,
+    "drms_95_m": 37.38
+  },
+  "EKF + AI-Velocity + NHC": {
+    "total_distance_m": 1153.11,
+    "final_drift_m": 46.01,
+    "drift_percent": 3.99,
+    "rmse_position_m": 20.97,
+    "cep_50_m": 12.27,
+    "drms_95_m": 41.3
+  },
+  "EKF + AI-Velocity + NHC + OSM Snap": {
+    "total_distance_m": 1153.11,
+    "final_drift_m": 26.38,
+    "drift_percent": 2.29,
+    "rmse_position_m": 15.48,
+    "cep_50_m": 11.38,
+    "drms_95_m": 26.23
+  },
+  "Velocity_Model_Performance": {
+    "mae_mps": 0.502,
+    "mae_kmh": 1.81,
+    "rmse_mps": 0.554,
+    "rmse_kmh": 2.0,
+    "max_error_mps": 0.725,
+    "max_error_kmh": 2.61,
+    "mean_actual_speed_kmh": 63.96,
+    "mean_predicted_speed_kmh": 62.19
+  }
+}

@@ -1,0 +1,60 @@
+# IDR System - AI-ML Intelligent Dead Reckoning
+# Byte-compiled / optimized
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Data (large files - never commit)
+data/
+*.csv
+*.zip
+*.pbf
+*.graphml
+
+# Model checkpoints (keep root/temp ignored, track committed weights in models/)
+*.pt
+*.pth
+*.onnx
+*.tflite
+!models/
+!models/**
+
+# Pytest & IDE
+.pytest_cache/
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
+notebooks/.ipynb_checkpoints/
+
+# Environment
+.env
+*.log
+
+# Reports and Results: track all markdown, figures, and plots
+!reports/figures/*.png
+!reports/figures/*.jpg
+!reports/figures/*.svg
+!results/figures/*.png
+!results/figures/*.jpg
+!results/figures/*.svg
+
