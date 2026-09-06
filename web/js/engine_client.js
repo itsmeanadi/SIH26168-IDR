@@ -153,6 +153,32 @@ class IDREngineClient {
   async listDrives() {
     return fetch(`${this.baseUrl}/api/replay/drives`).then((r) => r.json());
   }
+
+  async startRecording(notes = '', vehicleType = 'two_wheeler') {
+    return fetch(`${this.baseUrl}/api/recorder/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ notes, vehicle_type: vehicleType }),
+    }).then((r) => r.json());
+  }
+
+  async stopRecording() {
+    return fetch(`${this.baseUrl}/api/recorder/stop`, {
+      method: 'POST',
+    }).then((r) => r.json());
+  }
+
+  async addMarker(label, notes = '') {
+    return fetch(`${this.baseUrl}/api/recorder/marker`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label, notes }),
+    }).then((r) => r.json());
+  }
+
+  async getRecorderStatus() {
+    return fetch(`${this.baseUrl}/api/recorder/status`).then((r) => r.json());
+  }
 }
 
 function jsonParseSafe(str) {

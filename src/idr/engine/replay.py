@@ -107,6 +107,78 @@ class DriveReplayer:
         except Exception as e:
             return self._generate_synthetic_drive(drive_name, reset_engine=reset_engine)
 
+    def load_recorded_session(self, session_path_or_id: str, reset_engine: bool = True) -> bool:
+        """Load a recorded field experiment session (telemetry.csv)."""
+        from pathlib import Path
+        p = Path(session_path_or_id)
+        if not p.exists():
+            p = Path("data/sessions") / session_path_or_id
+            if p.is_dir():
+                p = p / "telemetry.csv"
+        elif p.is_dir():
+            p = p / "telemetry.csv"
+
+        if not p.exists():
+            return False
+
+        try:
+            df = pd.read_csv(p)
+            self.drive_name = p.parent.name if p.name == "telemetry.csv" else p.stem
+            self.data_frames = []
+
+            first_lat = 28.6139
+            first_lon = 77.2090
+            if "gnss_lat" in df.columns and len(df["gnss_lat"].dropna()) > 0:
+                first_lat = float(df["gnss_lat"].dropna().iloc[0])
+                first_lon = float(df["gnss_lon"].dropna().iloc[0])
+
+            if reset_engine:
+                self.engine.reset(ref_lat=first_lat, ref_lon=first_lon)
+
+            for _, row in df.iterrows():
+                t = float(row["timestamp"])
+                ax = float(row["acc_phone_x"]) if "acc_phone_x" in row else 0.0
+                ay = float(row["acc_phone_y"]) if "acc_phone_y" in row else 0.0
+                az = float(row["acc_phone_z"]) if "acc_phone_z" in row else 9.81
+                gx = float(row["gyro_phone_x"]) if "gyro_phone_x" in row else 0.0
+                gy = float(row["gyro_phone_y"]) if "gyro_phone_y" in row else 0.0
+                gz = float(row["gyro_phone_z"]) if "gyro_phone_z" in row else 0.0
+
+                imu_frame = SensorInputFrame(
+                    timestamp=t,
+                    acc_x=ax,
+                    acc_y=ay,
+                    acc_z=az,
+                    gyro_x=gx,
+                    gyro_y=gy,
+                    gyro_z=gz,
+                    mag_x=float(row["mag_x"]) if ("mag_x" in row and pd.notna(row["mag_x"])) else None,
+                    mag_y=float(row["mag_y"]) if ("mag_y" in row and pd.notna(row["mag_y"])) else None,
+                    mag_z=float(row["mag_z"]) if ("mag_z" in row and pd.notna(row["mag_z"])) else None,
+                    orientation_yaw=float(row["orientation_yaw"]) if ("orientation_yaw" in row and pd.notna(row["orientation_yaw"])) else None,
+                    orientation_pitch=float(row["orientation_pitch"]) if ("orientation_pitch" in row and pd.notna(row["orientation_pitch"])) else None,
+                    orientation_roll=float(row["orientation_roll"]) if ("orientation_roll" in row and pd.notna(row["orientation_roll"])) else None,
+                )
+
+                gnss_fix = None
+                if "has_new_gnss" in row and int(row["has_new_gnss"]) == 1 and pd.notna(row.get("gnss_lat")):
+                    gnss_fix = GNSSInputFix(
+                        timestamp=t,
+                        latitude=float(row["gnss_lat"]),
+                        longitude=float(row["gnss_lon"]),
+                        altitude=float(row["gnss_alt"]) if pd.notna(row.get("gnss_alt")) else 0.0,
+                        accuracy_m=float(row["gnss_accuracy_m"]) if pd.notna(row.get("gnss_accuracy_m")) else 3.0,
+                        speed_mps=float(row["gnss_speed_mps"]) if pd.notna(row.get("gnss_speed_mps")) else None,
+                        heading_deg=float(row["gnss_heading_deg"]) if pd.notna(row.get("gnss_heading_deg")) else None,
+                    )
+
+                self.data_frames.append((imu_frame, gnss_fix))
+
+            self.current_index = 0
+            return True
+        except Exception:
+            return False
+
     def _generate_synthetic_drive(self, drive_name: str, reset_engine: bool = True) -> bool:
         """Generate physics-consistent 10-minute motorcycle test route with turns and tunnels."""
         self.drive_name = f"{drive_name} (Benchmark Synthetic)"

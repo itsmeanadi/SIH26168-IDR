@@ -30,6 +30,7 @@ from idr.engine.navigation_engine import (
 )
 from idr.engine.health import NavigationMode
 from idr.engine.replay import DriveReplayer
+from idr.recorder import ExperimentRecorder
 import enum
 
 
@@ -54,9 +55,10 @@ def serialize_state(obj: Any) -> Any:
     return obj
 
 
-# Global Singleton Navigation Engine & Replayer
+# Global Singleton Navigation Engine, Replayer & Experiment Recorder
 engine = NavigationEngine(ref_lat=28.6139, ref_lon=77.2090, vehicle_type="two_wheeler")
 replayer = DriveReplayer(engine)
+recorder = ExperimentRecorder()
 active_websockets: List[WebSocket] = []
 replay_task: Optional[asyncio.Task] = None
 
@@ -124,6 +126,18 @@ class ReplayControlRequest(BaseModel):
     drive_name: Optional[str] = "Vf"
     progress: Optional[float] = 0.0
     speed: Optional[float] = 1.0
+
+
+class StartRecordingRequest(BaseModel):
+    session_id: Optional[str] = None
+    notes: Optional[str] = None
+    vehicle_type: Optional[str] = "two_wheeler"
+    device_info: Optional[Dict[str, Any]] = None
+
+
+class AddMarkerRequest(BaseModel):
+    label: str
+    notes: Optional[str] = None
 
 
 # ── REST Endpoints ────────────────────────────────────────────────────────────
@@ -268,6 +282,48 @@ async def control_replay(req: ReplayControlRequest):
     raise HTTPException(status_code=400, detail=f"Unknown action: {action}")
 
 
+@app.post("/api/recorder/start")
+def start_recording(req: StartRecordingRequest):
+    """Start recording a timestamped field telemetry session."""
+    session_id = recorder.start_session(
+        session_id=req.session_id,
+        notes=req.notes,
+        vehicle_type=req.vehicle_type or engine.vehicle_type,
+        device_info=req.device_info,
+    )
+    return {"status": "RECORDING_STARTED", "session_id": session_id}
+
+
+@app.post("/api/recorder/stop")
+def stop_recording():
+    """Stop active recording session and compile session summary."""
+    summary = recorder.stop_session()
+    if summary is None:
+        return {"status": "NO_ACTIVE_SESSION"}
+    return {"status": "RECORDING_STOPPED", "summary": summary}
+
+
+@app.post("/api/recorder/marker")
+def add_experiment_marker(req: AddMarkerRequest):
+    """Add timestamped event or maneuver annotation to active session."""
+    if not recorder.is_recording:
+        return {"status": "ERROR", "message": "No active recording session"}
+    recorder.add_marker(label=req.label, notes=req.notes)
+    return {"status": "MARKER_ADDED", "label": req.label}
+
+
+@app.get("/api/recorder/status")
+def get_recorder_status():
+    """Get active recording status and live metrics."""
+    return recorder.get_status()
+
+
+@app.get("/api/recorder/sessions")
+def list_recorded_sessions():
+    """List all saved experiment sessions from disk."""
+    return {"sessions": recorder.list_sessions()}
+
+
 @app.post("/api/step")
 def process_single_frame(req: SensorFrameRequest):
     """REST endpoint for single sensor frame ingestion."""
@@ -299,7 +355,13 @@ def process_single_frame(req: SensorFrameRequest):
             heading_deg=req.gnss_heading_deg,
         )
 
+    t0 = time.perf_counter()
     out = engine.process_frame(imu, gnss)
+    step_ms = (time.perf_counter() - t0) * 1000.0
+
+    if recorder.is_recording:
+        recorder.record_frame(imu, gnss, out, step_latency_ms=step_ms)
+
     return serialize_state(out)
 
 
@@ -349,12 +411,18 @@ async def websocket_navigation(websocket: WebSocket):
                         heading_deg=gnss_dict.get("heading_deg"),
                     )
 
+                t0 = time.perf_counter()
                 state = engine.process_frame(imu, gnss)
-                
+                step_ms = (time.perf_counter() - t0) * 1000.0
+
+                if recorder.is_recording:
+                    recorder.record_frame(imu, gnss, state, step_latency_ms=step_ms)
+
                 # Send updated navigation state back to client
                 await websocket.send_text(json.dumps({
                     "type": "nav_state",
                     "state": serialize_state(state),
+                    "recorder": recorder.get_status(),
                 }))
 
             elif msg_type == "command":
@@ -368,6 +436,16 @@ async def websocket_navigation(websocket: WebSocket):
                     engine.crash_detector.trigger_test_crash(cur_lat, cur_lon, engine.vehicle_type)
                 elif cmd == "cancel_crash":
                     engine.crash_detector.cancel_alert()
+                elif cmd == "start_recording":
+                    recorder.start_session(
+                        notes=data.get("notes"),
+                        vehicle_type=engine.vehicle_type,
+                        device_info=data.get("device_info"),
+                    )
+                elif cmd == "stop_recording":
+                    recorder.stop_session()
+                elif cmd == "add_marker":
+                    recorder.add_marker(label=data.get("label", "MARKER"), notes=data.get("notes"))
 
     except WebSocketDisconnect:
         if websocket in active_websockets:

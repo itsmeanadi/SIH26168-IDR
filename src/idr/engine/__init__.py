@@ -10,6 +10,7 @@ from .navigation_engine import (
     NavigationOutputState,
     SensorInputFrame,
 )
+from .resampler import TimestampAwareAIResampler
 from .replay import DriveReplayer
 
 __all__ = [
@@ -28,5 +29,6 @@ __all__ = [
     "GNSSInputFix",
     "NavigationOutputState",
     "NavigationEngine",
+    "TimestampAwareAIResampler",
     "DriveReplayer",
 ]

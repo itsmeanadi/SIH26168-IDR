@@ -1,8 +1,7 @@
-"""Calibration submodule for smartphone-to-vehicle attitude alignment."""
-
-from .alignment import PhoneToVehicleAligner, compute_rotation_matrix
+from .alignment import AlignmentState, PhoneToVehicleAligner, compute_rotation_matrix
 
 __all__ = [
+    "AlignmentState",
     "PhoneToVehicleAligner",
     "compute_rotation_matrix",
 ]

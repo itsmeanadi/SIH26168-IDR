@@ -109,6 +109,28 @@
         </div>
       </div>
 
+      <!-- Field Telemetry Recorder Card -->
+      <div style="background: rgba(0,0,0,0.4); border: 1px solid rgba(0, 242, 254, 0.4); border-radius: var(--radius-md); padding: 8px 10px; margin-top: 6px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <span style="font-size: 0.68rem; font-weight: 800; color: var(--cyan-accent); text-transform: uppercase;">⏺️ Field Telemetry Recorder</span>
+          <span id="rec-status-badge" style="font-size: 0.6rem; font-weight: 700; color: var(--text-muted); background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px;">IDLE</span>
+        </div>
+
+        <div style="display: flex; gap: 6px; align-items: center; margin-bottom: 6px;">
+          <button id="btn-toggle-recording" class="btn" style="flex: 1; padding: 6px; font-size: 0.72rem; background: var(--bg-card); border: 1px solid var(--rose-accent); color: var(--rose-accent);">
+            🔴 Start Recording
+          </button>
+          <span id="rec-timer-badge" style="font-family: monospace; font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); min-width: 50px; text-align: right;">00:00</span>
+        </div>
+
+        <div id="rec-marker-bar" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; font-size: 0.65rem;">
+          <button class="btn btn-marker" data-label="BRAKING" style="padding: 3px 2px; font-size: 0.62rem; background: rgba(255,255,255,0.05);">🛑 Brake</button>
+          <button class="btn btn-marker" data-label="TURN" style="padding: 3px 2px; font-size: 0.62rem; background: rgba(255,255,255,0.05);">↩️ Turn</button>
+          <button class="btn btn-marker" data-label="POTHOLE" style="padding: 3px 2px; font-size: 0.62rem; background: rgba(255,255,255,0.05);">⚠️ Bump</button>
+          <button class="btn btn-marker" data-label="OUTAGE_TEST" style="padding: 3px 2px; font-size: 0.62rem; background: rgba(255,255,255,0.05);">🚇 Tunnel</button>
+        </div>
+      </div>
+
       <!-- Four USPs Quick Bar -->
       <div class="usp-bar" style="margin-top: 6px;">
         <!-- USP 1 -->

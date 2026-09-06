@@ -18,6 +18,8 @@ env/
 
 # Data (large files - never commit)
 data/
+recordings/
+scratch/
 *.csv
 *.zip
 *.pbf

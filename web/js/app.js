@@ -16,6 +16,9 @@ class IDRApp {
     this.isPhoneSensorsActive = false;
     this.vehicleType = 'two_wheeler';
     this.isBlackoutSimulated = false;
+    this.isRecording = false;
+    this.recStartTime = null;
+    this.recTimer = null;
   }
 
   async init() {
@@ -216,6 +219,69 @@ class IDRApp {
 
     const btnRefreshBS = document.getElementById('btn-refresh-blackspots');
     if (btnRefreshBS) btnRefreshBS.onclick = () => this._refreshBlackspots();
+
+    // Field Experiment Recorder Controls
+    const btnRec = document.getElementById('btn-toggle-recording');
+    const recBadge = document.getElementById('rec-status-badge');
+    const timerBadge = document.getElementById('rec-timer-badge');
+
+    if (btnRec) {
+      btnRec.onclick = async () => {
+        if (!this.isRecording) {
+          const res = await this.client.startRecording('Field Experiment Session', this.vehicleType);
+          if (res && res.status === 'RECORDING_STARTED') {
+            this.isRecording = true;
+            this.recStartTime = Date.now();
+            btnRec.textContent = '⏹ Stop Recording';
+            btnRec.style.background = 'var(--rose-accent)';
+            btnRec.style.color = '#fff';
+            if (recBadge) {
+              recBadge.textContent = '● RECORDING';
+              recBadge.style.color = '#f43f5e';
+            }
+            this.recTimer = setInterval(() => {
+              if (timerBadge && this.recStartTime) {
+                const elapsed = Math.floor((Date.now() - this.recStartTime) / 1000);
+                const m = String(Math.floor(elapsed / 60)).padStart(2, '0');
+                const s = String(elapsed % 60).padStart(2, '0');
+                timerBadge.textContent = `${m}:${s}`;
+              }
+            }, 1000);
+          }
+        } else {
+          const res = await this.client.stopRecording();
+          this.isRecording = false;
+          if (this.recTimer) {
+            clearInterval(this.recTimer);
+            this.recTimer = null;
+          }
+          btnRec.textContent = '🔴 Start Recording';
+          btnRec.style.background = 'var(--bg-card)';
+          btnRec.style.color = 'var(--rose-accent)';
+          if (recBadge) {
+            recBadge.textContent = 'SAVED';
+            recBadge.style.color = '#10b981';
+          }
+          if (timerBadge) timerBadge.textContent = '00:00';
+          console.log('[IDR] Session saved:', res);
+        }
+      };
+    }
+
+    // Event Marker Buttons
+    document.querySelectorAll('.btn-marker').forEach((btn) => {
+      btn.onclick = async () => {
+        const label = btn.dataset.label || 'MARKER';
+        await this.client.addMarker(label);
+        const origText = btn.textContent;
+        btn.textContent = '✓ LOGGED';
+        btn.style.borderColor = '#10b981';
+        setTimeout(() => {
+          btn.textContent = origText;
+          btn.style.borderColor = '';
+        }, 1200);
+      };
+    });
   }
 
   _onSensorFrame(frame) {
