@@ -1,0 +1,22 @@
+{
+  "name": "IDR - AI-ML Intelligent Dead Reckoning",
+  "short_name": "IDR Nav",
+  "description": "Mobile-First AI-ML Dead Reckoning Navigation System for Two-Wheelers & Cars",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#090d16",
+  "theme_color": "#0ea5e9",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

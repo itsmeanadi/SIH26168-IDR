@@ -1,0 +1,12 @@
+{
+  "hooks": {
+    "post_tool_execution": [
+      {
+        "matcher": "replace_file_content|write_to_file",
+        "command": "python -m pytest",
+        "description": "Automatically verify test suite health after code modifications",
+        "continue_on_error": true
+      }
+    ]
+  }
+}

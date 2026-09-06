@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>IDR — AI-ML Intelligent Dead Reckoning System</title>
+  <meta name="description" content="AI-ML Intelligent Dead Reckoning for Two-Wheelers and Cars (SIH PS 26168)">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#0ea5e9">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+
+  <!-- App Header -->
+  <header class="app-header">
+    <div class="brand-title">
+      <span>🚀 IDR NAVIGATION</span>
+      <span class="brand-badge">SIH 26168</span>
+    </div>
+
+    <div class="header-controls">
+      <!-- Input Source Indicator (Live Phone vs Replay Simulation) -->
+      <span id="data-source-badge" style="font-size: 0.7rem; font-weight: 700; padding: 4px 8px; border-radius: 4px; background: rgba(148, 163, 184, 0.15); border: 1px solid var(--bg-card-border); color: var(--text-secondary);">
+        SOURCE: ⏸️ STANDBY
+      </span>
+
+      <button id="btn-profile-bike" class="btn-profile active" title="Switch to Two-Wheeler Lean Dynamics">
+        🛵 Two-Wheeler
+      </button>
+      <button id="btn-profile-car" class="btn-profile" title="Switch to Car Dynamics">
+        🚗 Car
+      </button>
+      <div style="display: flex; align-items: center; gap: 6px; margin-left: 6px; font-size: 0.75rem; color: var(--text-secondary);">
+        <span id="connection-status-dot" class="status-dot pulsing"></span>
+        <span id="connection-status-text">WS CONNECTED</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Cockpit Layout -->
+  <main class="main-container">
+
+    <!-- Left Column: Primary Telemetry & Cockpit HUD -->
+    <section class="card" style="display: flex; flex-direction: column; gap: 12px;">
+      <div class="card-header">
+        <span class="card-title">⚡ Real-Time Cockpit</span>
+        <span id="nav-mode-pill" class="nav-mode-badge mode-gnss">GNSS+INS FULL</span>
+      </div>
+
+      <div class="telemetry-grid">
+        <div class="gauge-box">
+          <div id="val-speed" class="gauge-val">0.0</div>
+          <div class="gauge-unit">m/s</div>
+          <div id="val-speed-kmh" class="gauge-label">0.0 km/h</div>
+        </div>
+
+        <div class="gauge-box">
+          <div id="val-heading" class="gauge-val">0°</div>
+          <div class="gauge-unit">HEADING</div>
+          <div class="gauge-label">COMPASS ENU</div>
+        </div>
+
+        <div class="gauge-box" style="grid-column: span 2;">
+          <div class="card-title" style="justify-content: space-between; margin-bottom: 4px;">
+            <span>🏍️ Two-Wheeler Lean Angle</span>
+            <span id="val-lean" style="font-family: monospace; font-size: 0.85rem; color: var(--cyan-accent);">0.0°</span>
+          </div>
+          <div class="lean-visualizer">
+            <div class="lean-horizon"></div>
+            <div id="lean-bike-icon" class="bike-icon">🏍️</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Mobile Sensor Ingestion Button -->
+      <button id="btn-toggle-sensors" class="btn btn-block" style="margin-top: 4px;">
+        📱 Start Live Phone IMU+GNSS
+      </button>
+
+      <!-- Four USPs Quick Bar -->
+      <div class="usp-bar" style="margin-top: 6px;">
+        <!-- USP 1 -->
+        <div class="usp-pill">
+          <div class="usp-pill-title">USP 1: GNSS Trust</div>
+          <div class="usp-pill-val">
+            <span id="val-trust-score" style="color: var(--emerald-accent);">100%</span>
+            <span id="val-gnss-status" style="font-size: 0.7rem; color: var(--text-muted);">TRUSTED</span>
+          </div>
+          <div class="progress-bar-bg">
+            <div id="bar-trust" class="progress-bar-fill" style="width: 100%;"></div>
+          </div>
+        </div>
+
+        <!-- USP 3 -->
+        <div class="usp-pill">
+          <div class="usp-pill-title">USP 3: Blackspots</div>
+          <div class="usp-pill-val">
+            <span id="val-blackspot-count" style="color: var(--purple-accent);">0</span>
+            <span style="font-size: 0.7rem; color: var(--text-muted);">DETECTED</span>
+          </div>
+          <div style="font-size: 0.65rem; color: var(--text-muted); margin-top: 4px;">Auto-Logged Zones</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Center Column: Leaflet Live Navigation Map -->
+    <section class="card map-card">
+      <div id="map"></div>
+      
+      <!-- Overlay Map Controls -->
+      <div class="map-overlay-controls">
+        <button id="btn-map-center" class="map-btn" title="Center on Vehicle">🎯</button>
+        <button id="btn-refresh-blackspots" class="map-btn" title="Refresh Blackspots Layer">🗺️</button>
+      </div>
+    </section>
+
+    <!-- Right Column: Diagnostics & Simulation/Replay Controls -->
+    <section class="card" style="display: flex; flex-direction: column; gap: 12px;">
+      
+      <!-- USP 2: Diagnostics Table -->
+      <div>
+        <div class="card-header">
+          <span class="card-title">🔍 USP 2: Health Telemetry</span>
+        </div>
+        <table class="diag-table">
+          <tbody>
+            <tr>
+              <td style="color: var(--text-secondary);">Position Uncertainty (1σ)</td>
+              <td id="val-pos-unc" style="color: var(--cyan-accent);">±1.2 m</td>
+            </tr>
+            <tr>
+              <td style="color: var(--text-secondary);">Heading Uncertainty (1σ)</td>
+              <td id="val-heading-unc">±1.5°</td>
+            </tr>
+            <tr>
+              <td style="color: var(--text-secondary);">IMU Noise (Allan Var)</td>
+              <td id="val-imu-noise">0.045 m/s²</td>
+            </tr>
+            <tr>
+              <td style="color: var(--text-secondary);">Phone Dynamic Alignment</td>
+              <td id="val-aligned" style="color: var(--emerald-accent);">CALIBRATED</td>
+            </tr>
+            <tr>
+              <td style="color: var(--text-secondary);">Accumulated DR Distance</td>
+              <td id="val-dr-dist">0.0 m</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <hr style="border: 0; border-top: 1px solid var(--bg-card-border);">
+
+      <!-- Simulation & Interactive Controls -->
+      <div>
+        <div class="card-header">
+          <span class="card-title">🎮 Simulation & USPs</span>
+        </div>
+
+        <div class="control-group">
+          <!-- Blackout Toggle -->
+          <button id="btn-toggle-blackout" class="btn btn-secondary btn-block">
+            🌑 Simulate Tunnel Blackout
+          </button>
+
+          <!-- Test Crash -->
+          <button id="btn-test-crash" class="btn btn-secondary btn-block" style="color: var(--rose-accent);">
+            🚨 Test USP 4: Crash & SOS
+          </button>
+        </div>
+      </div>
+
+      <hr style="border: 0; border-top: 1px solid var(--bg-card-border);">
+
+      <!-- IO-VNBD Drive Replayer -->
+      <div>
+        <div class="card-header">
+          <span class="card-title">📼 IO-VNBD Replayer</span>
+          <span id="replay-status-text" style="font-size: 0.7rem; color: var(--text-muted);">Vf (0%)</span>
+        </div>
+
+        <select id="select-drive" style="width: 100%; background: #0c121e; color: #fff; border: 1px solid var(--bg-card-border); padding: 6px; border-radius: var(--radius-sm); font-size: 0.8rem; margin-bottom: 6px;">
+          <option value="Vf">Vf (Motorway High Speed)</option>
+          <option value="M">M (Urban & Roundabouts)</option>
+          <option value="S">S (Curved Roads)</option>
+          <option value="Y1">Y1 (Validation Track)</option>
+          <option value="Synthetic Benchmark">Synthetic Benchmark (Turns & Tunnel)</option>
+        </select>
+
+        <div class="action-row">
+          <button id="btn-replay-play" class="btn" style="flex: 1;">▶ Play</button>
+          <button id="btn-replay-pause" class="btn btn-secondary" style="flex: 1;">⏸ Pause</button>
+          <button id="btn-replay-step" class="btn btn-secondary">⏭ Step</button>
+        </div>
+
+        <div class="replay-scrubber-container">
+          <input type="range" id="replay-scrubber" class="scrubber-slider" min="0" max="100" value="0">
+        </div>
+
+        <div class="action-row" style="margin-top: 6px;">
+          <button class="btn btn-secondary btn-speed active" data-speed="1.0" style="flex: 1; font-size: 0.75rem; padding: 4px;">1x</button>
+          <button class="btn btn-secondary btn-speed" data-speed="2.0" style="flex: 1; font-size: 0.75rem; padding: 4px;">2x</button>
+          <button class="btn btn-secondary btn-speed" data-speed="5.0" style="flex: 1; font-size: 0.75rem; padding: 4px;">5x</button>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- USP 4: Emergency Crash Modal -->
+  <div id="crash-modal" class="modal-overlay">
+    <div class="crash-modal-card">
+      <h2 style="color: var(--rose-accent); font-size: 1.3rem;">⚠️ POTENTIAL CRASH DETECTED</h2>
+      <p style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 4px;">
+        High deceleration shock & abnormal rotation detected.
+      </p>
+
+      <div id="crash-countdown" class="crash-countdown-ring">15s</div>
+
+      <div id="crash-impact-g" style="font-weight: 700; color: #fff; font-size: 1rem;">
+        4.8g Peak Impact
+      </div>
+
+      <div id="crash-location-text" style="font-size: 0.75rem; color: var(--text-muted); margin: 8px 0; background: rgba(0,0,0,0.4); padding: 8px; border-radius: 6px;">
+        Locked Dead Reckoning Position
+      </div>
+
+      <div style="display: flex; gap: 8px; margin-top: 14px;">
+        <button id="btn-dispatch-sos" class="btn btn-danger btn-block" style="flex: 1;">
+          🆘 Send SOS Now
+        </button>
+        <button id="btn-cancel-crash" class="btn btn-secondary btn-block" style="flex: 1;">
+          I'm OK (Cancel)
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="/js/sensor_layer.js"></script>
+  <script src="/js/engine_client.js"></script>
+  <script src="/js/map_layer.js"></script>
+  <script src="/js/diagnostic_ui.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>
