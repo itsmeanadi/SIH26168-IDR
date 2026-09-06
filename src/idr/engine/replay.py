@@ -24,7 +24,7 @@ class DriveReplayer:
         self.data_frames: List[Tuple[SensorInputFrame, Optional[GNSSInputFix]]] = []
         self.drive_name = ""
 
-    def load_iovnbd_drive(self, drive_name: str = "Vf", data_dir: str = "data/raw/categorised") -> bool:
+    def load_iovnbd_drive(self, drive_name: str = "Vf", data_dir: str = "data/raw/categorised", reset_engine: bool = True) -> bool:
         """Load an IO-VNBD categorized drive (e.g. Vf, M, S, Y1, Vta, Vtb, Vw)."""
         s_path = os.path.join(data_dir, drive_name, f"S-{drive_name}.csv")
         v_path = os.path.join(data_dir, drive_name, f"V-{drive_name}.csv")
@@ -37,7 +37,7 @@ class DriveReplayer:
 
         if not os.path.exists(s_path):
             # Fallback to generating synthetic benchmark trajectory
-            return self._generate_synthetic_drive(drive_name)
+            return self._generate_synthetic_drive(drive_name, reset_engine=reset_engine)
 
         try:
             df_s = pd.read_csv(s_path)
@@ -64,7 +64,8 @@ class DriveReplayer:
             first_lat = float(df_s[lat_col[0]].dropna().iloc[0]) if has_gps and len(df_s[lat_col[0]].dropna()) > 0 else 28.6139
             first_lon = float(df_s[lon_col[0]].dropna().iloc[0]) if has_gps and len(df_s[lon_col[0]].dropna()) > 0 else 77.2090
 
-            self.engine.reset(ref_lat=first_lat, ref_lon=first_lon)
+            if reset_engine:
+                self.engine.reset(ref_lat=first_lat, ref_lon=first_lon)
 
             # Downsample / stride to ~10 Hz if needed
             step_size = 1
@@ -104,14 +105,15 @@ class DriveReplayer:
             self.current_index = 0
             return True
         except Exception as e:
-            return self._generate_synthetic_drive(drive_name)
+            return self._generate_synthetic_drive(drive_name, reset_engine=reset_engine)
 
-    def _generate_synthetic_drive(self, drive_name: str) -> bool:
+    def _generate_synthetic_drive(self, drive_name: str, reset_engine: bool = True) -> bool:
         """Generate physics-consistent 10-minute motorcycle test route with turns and tunnels."""
         self.drive_name = f"{drive_name} (Benchmark Synthetic)"
         self.data_frames = []
         ref_lat, ref_lon = 28.6139, 77.2090
-        self.engine.reset(ref_lat=ref_lat, ref_lon=ref_lon)
+        if reset_engine:
+            self.engine.reset(ref_lat=ref_lat, ref_lon=ref_lon)
 
         dt = 0.1
         total_steps = 1500  # 150 seconds of 10 Hz navigation

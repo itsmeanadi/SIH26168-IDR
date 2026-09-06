@@ -140,6 +140,7 @@ class NavigationEngine:
         self.prev_dr_pos_enu = np.zeros(2)
         self.latest_ai_speed = 0.0
         self.current_lean_angle = 0.0
+        self.has_gps_anchor = False
 
         # Trajectory storage for rendering
         self.gnss_history: List[Tuple[float, float]] = []
@@ -187,6 +188,12 @@ class NavigationEngine:
         t = imu.timestamp
         acc_raw = np.array([imu.acc_x, imu.acc_y, imu.acc_z], dtype=np.float32)
         gyro_raw = np.array([imu.gyro_x, imu.gyro_y, imu.gyro_z], dtype=np.float32)
+        if not np.all(np.isfinite(acc_raw)):
+            acc_raw = np.nan_to_num(acc_raw, nan=0.0, posinf=9.81, neginf=-9.81)
+            if np.linalg.norm(acc_raw) < 1e-3:
+                acc_raw[2] = 9.81
+        if not np.all(np.isfinite(gyro_raw)):
+            gyro_raw = np.nan_to_num(gyro_raw, nan=0.0, posinf=0.0, neginf=0.0)
 
         # 1. Update Diagnostics Sensor Stats
         self.health_engine.update_sensor_stats(acc_raw, gyro_raw)
@@ -257,6 +264,15 @@ class NavigationEngine:
             implied_speed_mps=0.0,
             is_trusted=False if (gnss is None or self.is_gnss_denied_simulated) else True,
         )
+
+        # Auto-anchor ENU tangent plane to first valid GNSS fix if not already anchored
+        if not self.has_gps_anchor and gnss is not None and not self.is_gnss_denied_simulated:
+            if np.isfinite(gnss.latitude) and np.isfinite(gnss.longitude):
+                self.ref_lat = float(gnss.latitude)
+                self.ref_lon = float(gnss.longitude)
+                self.fusion = GNSSINSFusion(ref_lat=self.ref_lat, ref_lon=self.ref_lon, dt=self.dt)
+                self.has_gps_anchor = True
+                self.prev_dr_pos_enu = np.zeros(2)
 
         cur_lat, cur_lon = self.fusion.enu_to_latlon(self.fusion.ekf.x[0], self.fusion.ekf.x[1])
         nav_mode = NavigationMode.GNSS_INS_FULL
@@ -417,9 +433,9 @@ class NavigationEngine:
             gnss_trust_score=round(gnss_trust_res.trust_score, 2),
             gnss_status=gnss_trust_res.status.value,
             pos_uncertainty_m=round(pos_unc_1s, 2),
-            is_in_blackout=self.in_blackout,
-            is_stationary=is_stationary,
-            is_aligned=self.aligner.is_calibrated,
+            is_in_blackout=bool(self.in_blackout),
+            is_stationary=bool(is_stationary),
+            is_aligned=bool(self.aligner.is_calibrated),
             diagnostics=diagnostics,
             active_blackspot_id=self.blackspot_tracker.active_outage.id if self.blackspot_tracker.active_outage else None,
             active_crash_alert=crash_alert,
@@ -427,9 +443,13 @@ class NavigationEngine:
 
     def reset(self, ref_lat: Optional[float] = None, ref_lon: Optional[float] = None):
         """Reset filter and state."""
-        lat = ref_lat if ref_lat is not None else self.ref_lat
-        lon = ref_lon if ref_lon is not None else self.ref_lon
-        self.fusion = GNSSINSFusion(ref_lat=lat, ref_lon=lon, dt=self.dt)
+        if ref_lat is not None and ref_lon is not None:
+            self.ref_lat = float(ref_lat)
+            self.ref_lon = float(ref_lon)
+            self.has_gps_anchor = True
+        else:
+            self.has_gps_anchor = False
+        self.fusion = GNSSINSFusion(ref_lat=self.ref_lat, ref_lon=self.ref_lon, dt=self.dt)
         self.aligner = PhoneToVehicleAligner()
         self.stationary_detector = StationaryDetector(window_size=10, acc_var_threshold=0.15)
         self.reacquisition_smoother = ReacquisitionSmoother(blend_duration_sec=1.5, dt=self.dt)
@@ -439,6 +459,7 @@ class NavigationEngine:
         self.in_blackout = False
         self.blackout_start_time = None
         self.total_dr_distance = 0.0
+        self.prev_dr_pos_enu = np.zeros(2)
         self.gnss_history = []
         self.dr_history = []
         self.fused_history = []

@@ -135,3 +135,118 @@ def test_drive_replayer_synthetic():
     out = replayer.step()
     assert out is not None
     assert isinstance(out.latitude, float)
+
+
+def test_phone_to_vehicle_aligner_robustness():
+    """Regression tests for PhoneToVehicleAligner against LinAlgError, NaN, Inf, and degenerate covariances."""
+    from idr.calib.alignment import PhoneToVehicleAligner
+
+    aligner = PhoneToVehicleAligner()
+
+    # 1. Single-sample input (N=1, exact scenario that previously caused LinAlgError)
+    R1 = aligner.estimate_from_stationary_and_motion(
+        stationary_acc=np.array([[0.0, 0.0, 9.81]], dtype=np.float32),
+        motion_acc=np.array([[0.0, 0.0, 9.81]], dtype=np.float32),
+    )
+    assert np.all(np.isfinite(R1))
+    assert R1.shape == (3, 3)
+    assert abs(np.linalg.det(R1) - 1.0) < 1e-2
+
+    # 2. NaN inputs
+    R_nan = aligner.estimate_from_stationary_and_motion(
+        stationary_acc=np.array([[np.nan, np.nan, 9.81]], dtype=np.float32),
+        motion_acc=np.array([[np.nan, 0.0, np.nan]], dtype=np.float32),
+    )
+    assert np.all(np.isfinite(R_nan))
+    assert abs(np.linalg.det(R_nan) - 1.0) < 1e-2
+
+    # 3. Inf inputs
+    R_inf = aligner.estimate_from_stationary_and_motion(
+        stationary_acc=np.array([[np.inf, 0.0, 9.81]], dtype=np.float32),
+        motion_acc=np.array([[0.0, np.inf, 0.0]], dtype=np.float32),
+    )
+    assert np.all(np.isfinite(R_inf))
+    assert abs(np.linalg.det(R_inf) - 1.0) < 1e-2
+
+    # 4. Constant / Zero-variance degenerate samples
+    R_const = aligner.estimate_from_stationary_and_motion(
+        stationary_acc=np.ones((10, 3), dtype=np.float32) * 9.81,
+        motion_acc=np.ones((10, 3), dtype=np.float32) * 9.81,
+    )
+    assert np.all(np.isfinite(R_const))
+    assert abs(np.linalg.det(R_const) - 1.0) < 1e-2
+
+    # 5. Genuine dynamic forward motion samples
+    stat = np.array([[0.0, 0.0, 9.81], [0.01, -0.01, 9.80]], dtype=np.float32)
+    mot = np.array([
+        [1.0, 0.0, 9.81],
+        [2.0, 0.0, 9.81],
+        [3.0, 0.0, 9.81],
+        [2.5, 0.0, 9.81],
+    ], dtype=np.float32)
+    R_dyn = aligner.estimate_from_stationary_and_motion(stationary_acc=stat, motion_acc=mot)
+    assert np.all(np.isfinite(R_dyn))
+    assert abs(np.linalg.det(R_dyn) - 1.0) < 1e-2
+
+
+def test_navigation_engine_non_finite_and_degenerate_inputs():
+    """Verify NavigationEngine does not crash or produce HTTP 500 when fed non-finite or degenerate frames."""
+    engine = NavigationEngine(ref_lat=28.6139, ref_lon=77.2090)
+
+    # 1. Single frame with stationary gravity
+    imu_single = SensorInputFrame(timestamp=0.0, acc_x=0.0, acc_y=0.0, acc_z=9.81, gyro_x=0.0, gyro_y=0.0, gyro_z=0.0)
+    out1 = engine.process_frame(imu_single, None)
+    assert np.isfinite(out1.latitude)
+    assert np.isfinite(out1.forward_speed_mps)
+
+    # 2. NaN accelerometer input
+    imu_nan = SensorInputFrame(timestamp=0.1, acc_x=float("nan"), acc_y=0.0, acc_z=9.81, gyro_x=0.0, gyro_y=0.0, gyro_z=0.0)
+    out2 = engine.process_frame(imu_nan, None)
+    assert np.isfinite(out2.latitude)
+
+    # 3. Inf accelerometer input
+    imu_inf = SensorInputFrame(timestamp=0.2, acc_x=float("inf"), acc_y=0.0, acc_z=9.81, gyro_x=0.0, gyro_y=0.0, gyro_z=0.0)
+    out3 = engine.process_frame(imu_inf, None)
+    assert np.isfinite(out3.latitude)
+
+
+def test_navigation_engine_gnss_anchor_and_replay_isolation():
+    """Regression test: Ensure DriveReplayer preloading does not corrupt engine reference,
+    and NavigationEngine properly anchors to arbitrary geographic locations without thousands of km jumps.
+    """
+    # 1. Initialize engine
+    engine = NavigationEngine()
+    replayer = DriveReplayer(engine)
+
+    # 2. Preload a dataset with reset_engine=False (as done at server startup)
+    replayer.load_iovnbd_drive("Vf", reset_engine=False)
+    assert engine.has_gps_anchor is False
+
+    # 3. Supply a real-world GNSS fix from Delhi, India (~28.6139, 77.2090)
+    imu = SensorInputFrame(timestamp=1000.0, acc_x=0.0, acc_y=0.0, acc_z=9.81, gyro_x=0.0, gyro_y=0.0, gyro_z=0.0)
+    gnss_delhi = GNSSInputFix(timestamp=1000.0, latitude=28.6139, longitude=77.2090, altitude=216.0, accuracy_m=5.0)
+    out = engine.process_frame(imu, gnss_delhi)
+
+    # Engine must have anchored to Delhi, NOT UK (lat ~52.4)
+    assert engine.has_gps_anchor is True
+    assert abs(engine.ref_lat - 28.6139) < 1e-4
+    assert abs(engine.ref_lon - 77.2090) < 1e-4
+    assert abs(out.latitude - 28.6139) < 1e-4
+    assert abs(out.longitude - 77.2090) < 1e-4
+    assert out.gnss_trust_score >= 0.8
+    assert out.gnss_status == "TRUSTED"
+
+    # 4. Supply a series of frames in Bangalore, India after engine reset
+    engine.reset()
+    assert engine.has_gps_anchor is False
+
+    gnss_blr = GNSSInputFix(timestamp=2000.0, latitude=12.9716, longitude=77.5946, altitude=920.0, accuracy_m=4.0)
+    out_blr = engine.process_frame(imu, gnss_blr)
+    assert engine.has_gps_anchor is True
+    assert abs(engine.ref_lat - 12.9716) < 1e-4
+    assert abs(engine.ref_lon - 77.5946) < 1e-4
+    assert abs(out_blr.latitude - 12.9716) < 1e-4
+    assert abs(out_blr.longitude - 77.5946) < 1e-4
+    assert out_blr.gnss_trust_score >= 0.8
+    assert out_blr.gnss_status == "TRUSTED"
+

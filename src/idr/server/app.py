@@ -30,6 +30,28 @@ from idr.engine.navigation_engine import (
 )
 from idr.engine.health import NavigationMode
 from idr.engine.replay import DriveReplayer
+import enum
+
+
+def serialize_state(obj: Any) -> Any:
+    """Recursively converts dataclasses, Enums, and numpy scalar/array types to JSON-safe Python primitives."""
+    if isinstance(obj, np.bool_):
+        return bool(obj)
+    if isinstance(obj, (np.floating, float)):
+        return float(obj) if np.isfinite(obj) else 0.0
+    if isinstance(obj, (np.integer, int)):
+        return int(obj)
+    if isinstance(obj, np.ndarray):
+        return [serialize_state(x) for x in obj.tolist()]
+    if hasattr(obj, "__dataclass_fields__"):
+        return {k: serialize_state(getattr(obj, k)) for k in obj.__dataclass_fields__}
+    if isinstance(obj, dict):
+        return {k: serialize_state(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [serialize_state(x) for x in obj]
+    if isinstance(obj, enum.Enum):
+        return obj.value
+    return obj
 
 
 # Global Singleton Navigation Engine & Replayer
@@ -41,8 +63,8 @@ replay_task: Optional[asyncio.Task] = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Load default synthetic/demo dataset for instant demonstration
-    replayer.load_iovnbd_drive("Vf")
+    # Startup: Load default synthetic/demo dataset metadata for instant demonstration without altering engine origin
+    replayer.load_iovnbd_drive("Vf", reset_engine=False)
     yield
     # Shutdown
     if replay_task and not replay_task.done():
@@ -218,7 +240,7 @@ async def control_replay(req: ReplayControlRequest):
 
     if action == "load":
         drive = req.drive_name or "Vf"
-        ok = replayer.load_iovnbd_drive(drive)
+        ok = replayer.load_iovnbd_drive(drive, reset_engine=True)
         return {"status": "LOADED" if ok else "FAILED", "drive": replayer.drive_name}
 
     elif action == "play":
@@ -278,7 +300,7 @@ def process_single_frame(req: SensorFrameRequest):
         )
 
     out = engine.process_frame(imu, gnss)
-    return asdict(out)
+    return serialize_state(out)
 
 
 # ── WebSocket Bidirectional Telemetry ─────────────────────────────────────────
@@ -332,7 +354,7 @@ async def websocket_navigation(websocket: WebSocket):
                 # Send updated navigation state back to client
                 await websocket.send_text(json.dumps({
                     "type": "nav_state",
-                    "state": asdict(state),
+                    "state": serialize_state(state),
                 }))
 
             elif msg_type == "command":
@@ -366,7 +388,7 @@ async def _replay_loop():
         if active_websockets:
             payload = json.dumps({
                 "type": "nav_state",
-                "state": asdict(state),
+                "state": serialize_state(state),
                 "replay_status": replayer.get_status(),
             })
             for ws in list(active_websockets):

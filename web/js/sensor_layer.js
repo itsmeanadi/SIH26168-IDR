@@ -203,32 +203,38 @@ class MobileSensorLayer {
 
     // 1. Accelerometer
     const acc = event.accelerationIncludingGravity || event.acceleration;
-    if (acc && (acc.x !== null && acc.x !== undefined)) {
-      this.latestImu.acc_x = Number(acc.x);
-      this.latestImu.acc_y = Number(acc.y || 0.0);
-      this.latestImu.acc_z = Number(acc.z !== null && acc.z !== undefined ? acc.z : 9.81);
-      this.telemetry.accel.hasData = true;
-      this.telemetry.accel.count++;
-      this.telemetry.accel.lastTimestamp = epochSec;
-      this.telemetry.accel.raw = [acc.x, acc.y, acc.z];
+    if (acc) {
+      const ax = Number(acc.x);
+      const ay = Number(acc.y);
+      const az = Number(acc.z);
+      if (Number.isFinite(ax) && Number.isFinite(ay) && Number.isFinite(az)) {
+        this.latestImu.acc_x = ax;
+        this.latestImu.acc_y = ay;
+        this.latestImu.acc_z = az;
+        this.telemetry.accel.hasData = true;
+        this.telemetry.accel.count++;
+        this.telemetry.accel.lastTimestamp = epochSec;
+        this.telemetry.accel.raw = [ax, ay, az];
+      }
     }
 
     // 2. Gyroscope (rotationRate provides degrees/sec -> convert to rad/s)
     const rot = event.rotationRate;
     const DEG_TO_RAD = Math.PI / 180.0;
-    if (rot && (rot.alpha !== null && rot.alpha !== undefined)) {
-      // Android W3C standard: beta=pitch (X), gamma=roll (Y), alpha=yaw (Z)
-      this.latestImu.gyro_x = Number(rot.beta || 0.0) * DEG_TO_RAD;
-      this.latestImu.gyro_y = Number(rot.gamma || 0.0) * DEG_TO_RAD;
-      this.latestImu.gyro_z = Number(rot.alpha || 0.0) * DEG_TO_RAD;
-      this.telemetry.gyro.hasData = true;
-      this.telemetry.gyro.count++;
-      this.telemetry.gyro.lastTimestamp = epochSec;
-      this.telemetry.gyro.raw = [rot.beta, rot.gamma, rot.alpha];
-    } else {
-      this.latestImu.gyro_x = 0.0;
-      this.latestImu.gyro_y = 0.0;
-      this.latestImu.gyro_z = 0.0;
+    if (rot) {
+      const gx = Number(rot.beta);
+      const gy = Number(rot.gamma);
+      const gz = Number(rot.alpha);
+      if (Number.isFinite(gx) && Number.isFinite(gy) && Number.isFinite(gz)) {
+        // Android W3C standard: beta=pitch (X), gamma=roll (Y), alpha=yaw (Z)
+        this.latestImu.gyro_x = gx * DEG_TO_RAD;
+        this.latestImu.gyro_y = gy * DEG_TO_RAD;
+        this.latestImu.gyro_z = gz * DEG_TO_RAD;
+        this.telemetry.gyro.hasData = true;
+        this.telemetry.gyro.count++;
+        this.telemetry.gyro.lastTimestamp = epochSec;
+        this.telemetry.gyro.raw = [gx, gy, gz];
+      }
     }
 
     // Throttle frame rate for WebSocket transmission (target 50 Hz)
@@ -251,14 +257,19 @@ class MobileSensorLayer {
     if (!this.isActive) return;
 
     if (event.alpha !== null && event.alpha !== undefined) {
-      this.latestImu.orientation_yaw = Number(event.alpha);   // Compass yaw [0, 360]
-      this.latestImu.orientation_pitch = Number(event.beta || 0); // Front/back tilt [-180, 180]
-      this.latestImu.orientation_roll = Number(event.gamma || 0);  // Left/right roll [-90, 90]
+      const yaw = Number(event.alpha);
+      const pitch = Number(event.beta || 0);
+      const roll = Number(event.gamma || 0);
+      if (Number.isFinite(yaw) && Number.isFinite(pitch) && Number.isFinite(roll)) {
+        this.latestImu.orientation_yaw = yaw;     // Compass yaw [0, 360]
+        this.latestImu.orientation_pitch = pitch; // Front/back tilt [-180, 180]
+        this.latestImu.orientation_roll = roll;   // Left/right roll [-90, 90]
 
-      this.telemetry.orientation.hasData = true;
-      this.telemetry.orientation.count++;
-      this.telemetry.orientation.lastTimestamp = Date.now() / 1000.0;
-      this.telemetry.orientation.raw = [event.alpha, event.beta, event.gamma];
+        this.telemetry.orientation.hasData = true;
+        this.telemetry.orientation.count++;
+        this.telemetry.orientation.lastTimestamp = Date.now() / 1000.0;
+        this.telemetry.orientation.raw = [yaw, pitch, roll];
+      }
     }
   }
 

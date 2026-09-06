@@ -48,52 +48,97 @@ class PhoneToVehicleAligner:
             motion_acc: (K, 3) accel during forward acceleration / braking
             motion_vel: Optional (K, 3) velocity in local frame
         """
-        # Step 1: Vertical axis (Z_v) from mean gravity vector
-        mean_g = np.mean(stationary_acc, axis=0)
-        norm_g = np.linalg.norm(mean_g)
-        if norm_g < 1e-3:
+        # ── Step 0: Input Sanitization & Finite Validation ────────────────────
+        stat = np.asarray(stationary_acc, dtype=np.float64)
+        if stat.ndim == 1:
+            stat = stat.reshape(1, -1)
+        valid_stat = stat[np.all(np.isfinite(stat), axis=1)]
+        if len(valid_stat) == 0:
+            valid_stat = np.array([[0.0, 0.0, 9.81]])
+
+        # ── Step 1: Vertical Axis (Z_v) from Mean Gravity Vector ─────────────
+        mean_g = np.mean(valid_stat, axis=0)
+        norm_g = float(np.linalg.norm(mean_g))
+        if not np.isfinite(norm_g) or norm_g < 1e-3:
             z_phone = np.array([0.0, 0.0, 1.0])
         else:
             # Gravity points downwards; vehicle Z points upwards
             z_phone = mean_g / norm_g
 
-        # Step 2: Forward axis (X_v) from longitudinal acceleration
-        # Subtract gravity projection to obtain dynamic acceleration
-        dyn_acc = motion_acc - np.outer(motion_acc @ z_phone, z_phone)
-        
-        # Principal axis of forward motion via PCA (first eigenvector)
-        cov = np.cov(dyn_acc, rowvar=False)
-        eigenvalues, eigenvectors = np.linalg.eigh(cov)
-        x_phone = eigenvectors[:, np.argmax(eigenvalues)]
+        # ── Step 2: Forward Axis (X_v) from Longitudinal Acceleration ────────
+        mot = np.asarray(motion_acc, dtype=np.float64)
+        if mot.ndim == 1:
+            mot = mot.reshape(1, -1)
+        valid_mot = mot[np.all(np.isfinite(mot), axis=1)]
+
+        x_phone: Optional[np.ndarray] = None
+
+        # Only compute PCA if we have at least 2 distinct dynamic samples
+        if len(valid_mot) >= 2:
+            # Subtract gravity projection to obtain dynamic acceleration
+            dyn_acc = valid_mot - np.outer(valid_mot @ z_phone, z_phone)
+            if np.all(np.isfinite(dyn_acc)):
+                cov = np.cov(dyn_acc, rowvar=False)
+                # Ensure covariance is finite and has non-degenerate variance (trace > 1e-5)
+                if np.all(np.isfinite(cov)) and float(np.trace(cov)) > 1e-5:
+                    try:
+                        eigenvalues, eigenvectors = np.linalg.eigh(cov)
+                        if np.all(np.isfinite(eigenvalues)) and np.all(np.isfinite(eigenvectors)):
+                            x_phone = eigenvectors[:, int(np.argmax(eigenvalues))]
+                    except np.linalg.LinAlgError:
+                        x_phone = None
+
+        # Safe deterministic horizontal reference if PCA is degenerate or unavailable
+        if x_phone is None or not np.all(np.isfinite(x_phone)):
+            # Pick a canonical horizontal reference orthogonal to z_phone
+            ref_vec = np.array([0.0, 1.0, 0.0]) if abs(z_phone[1]) < 0.9 else np.array([1.0, 0.0, 0.0])
+            x_cand = ref_vec - np.dot(ref_vec, z_phone) * z_phone
+            norm_x = float(np.linalg.norm(x_cand))
+            if norm_x > 1e-4:
+                x_phone = x_cand / norm_x
+            else:
+                ref_vec2 = np.array([1.0, 0.0, 0.0])
+                x_cand2 = ref_vec2 - np.dot(ref_vec2, z_phone) * z_phone
+                x_phone = x_cand2 / (float(np.linalg.norm(x_cand2)) + 1e-8)
 
         # Determine forward direction sign using velocity change
         if motion_vel is not None and len(motion_vel) > 1:
-            dv = motion_vel[-1] - motion_vel[0]
-            if np.dot(x_phone, dv[:3]) < 0:
-                x_phone = -x_phone
+            valid_vel = np.asarray(motion_vel, dtype=np.float64)
+            if np.all(np.isfinite(valid_vel)):
+                dv = valid_vel[-1] - valid_vel[0]
+                if np.dot(x_phone, dv[:3]) < 0:
+                    x_phone = -x_phone
 
-        # Step 3: Lateral axis (Y_v) = Z_v x X_v (orthonormal right-handed frame)
+        # ── Step 3: Lateral Axis (Y_v) & Gram-Schmidt Orthonormalization ───────
         y_phone = np.cross(z_phone, x_phone)
-        norm_y = np.linalg.norm(y_phone)
+        norm_y = float(np.linalg.norm(y_phone))
         if norm_y > 1e-4:
             y_phone /= norm_y
         else:
             y_phone = np.array([0.0, 1.0, 0.0])
 
-        # Re-orthogonalize X = Y x Z
+        # Re-orthogonalize X = Y x Z to guarantee exact right-handed orthonormal frame
         x_phone = np.cross(y_phone, z_phone)
-        x_phone /= np.linalg.norm(x_phone)
+        norm_final_x = float(np.linalg.norm(x_phone))
+        if norm_final_x > 1e-4:
+            x_phone /= norm_final_x
 
         # R maps phone coordinates to vehicle frame: v_vehicle = R @ v_phone
-        # R rows are [x_phone; y_phone; z_phone]
         R = np.vstack([x_phone, y_phone, z_phone]).astype(np.float32)
-        self.R_phone_to_vehicle = R
-        self.is_calibrated = True
-        return R
+        if np.all(np.isfinite(R)):
+            self.R_phone_to_vehicle = R
+            self.is_calibrated = True
+        return self.R_phone_to_vehicle
 
     def transform_imu(self, acc: np.ndarray, gyro: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """Rotate IMU vectors into the vehicle frame."""
         # acc: (N, 3), gyro: (N, 3)
-        acc_v = (self.R_phone_to_vehicle @ acc.T).T
-        gyro_v = (self.R_phone_to_vehicle @ gyro.T).T
+        acc_arr = np.asarray(acc, dtype=np.float32)
+        gyro_arr = np.asarray(gyro, dtype=np.float32)
+        if not np.all(np.isfinite(acc_arr)):
+            acc_arr = np.nan_to_num(acc_arr, nan=0.0)
+        if not np.all(np.isfinite(gyro_arr)):
+            gyro_arr = np.nan_to_num(gyro_arr, nan=0.0)
+        acc_v = (self.R_phone_to_vehicle @ acc_arr.T).T
+        gyro_v = (self.R_phone_to_vehicle @ gyro_arr.T).T
         return acc_v, gyro_v

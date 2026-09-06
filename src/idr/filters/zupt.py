@@ -67,7 +67,7 @@ class StationaryDetector:
             acc_var < self.acc_var_threshold
             and gyro_mean_norm < self.gyro_norm_threshold
         )
-        return is_stationary
+        return bool(is_stationary)
 
 
 def apply_zupt(
