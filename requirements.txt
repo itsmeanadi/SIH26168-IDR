@@ -1,5 +1,5 @@
-# IDR System - Pinned Requirements
-# Python 3.11 | PyTorch CPU | Sensor Fusion + ML
+# IDR System - Requirements
+# Python 3.11+ | PyTorch CPU | Sensor Fusion + ML
 
 # ── Core ML ──────────────────────────────────────────────
 torch
@@ -7,32 +7,32 @@ torchvision
 torchaudio
 
 # ── Scientific Computing ─────────────────────────────────
-numpy==1.26.4
-pandas==2.2.2
-scipy==1.13.1
-scikit-learn==1.5.1
+numpy>=1.26
+pandas>=2.2
+scipy>=1.13
+scikit-learn>=1.5
 
 # ── Filtering ────────────────────────────────────────────
-filterpy==1.4.5
+filterpy>=1.4.5
 
 # ── Geospatial / Map-Matching ────────────────────────────
-osmnx==1.9.3
-pyproj==3.6.1
-shapely==2.0.4
-networkx==3.3
-geopandas==0.14.4
+osmnx>=1.9
+pyproj>=3.6
+shapely>=2.0
+networkx>=3.3
+geopandas>=0.14
 
 # ── Plotting ─────────────────────────────────────────────
-matplotlib==3.9.1
+matplotlib>=3.9
 
 # ── Export (ONNX + TFLite) ───────────────────────────────
-onnx==1.16.1
-onnxruntime==1.18.1
+onnx>=1.16
+onnxruntime>=1.18
 
 # ── Utilities ────────────────────────────────────────────
-tqdm==4.66.4
-pyyaml==6.0.1
+tqdm>=4.66
+pyyaml>=6.0
 
-# ── Optional: Streamlit demo (install separately) ───────
-# streamlit==1.36.0
-# folium==0.17.0
+# ── Demo App ─────────────────────────────────────────────
+streamlit>=1.36
+folium>=0.17
