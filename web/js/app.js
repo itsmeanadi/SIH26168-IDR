@@ -8,7 +8,10 @@ class IDRApp {
     this.client = new IDREngineClient();
     this.map = new IDRMapLayer('map');
     this.diag = new IDRDiagnosticUI();
-    this.sensors = new MobileSensorLayer((frame) => this._onSensorFrame(frame));
+    this.sensors = new MobileSensorLayer(
+      (frame) => this._onSensorFrame(frame),
+      (telem) => this._onSensorTelemetry(telem)
+    );
 
     this.isPhoneSensorsActive = false;
     this.vehicleType = 'two_wheeler';
@@ -72,35 +75,42 @@ class IDRApp {
 
     if (btnSensors) {
       btnSensors.onclick = async () => {
-        if (!this.isPhoneSensorsActive) {
-          // Pause any ongoing replay to prevent data stream collision
-          await this.client.controlReplay('pause');
+        try {
+          if (!this.isPhoneSensorsActive) {
+            // Asynchronously pause any ongoing replay without blocking the user gesture
+            this.client.controlReplay('pause').catch((err) => console.warn('Replay pause non-critical notice:', err));
 
-          const started = await this.sensors.start();
-          if (started) {
-            this.isPhoneSensorsActive = true;
-            btnSensors.textContent = '⏹ Stop Phone Sensors';
-            btnSensors.className = 'btn btn-danger btn-block';
-            if (sourceBadge) {
-              sourceBadge.textContent = 'SOURCE: 📱 LIVE PHONE SENSORS';
-              sourceBadge.style.color = '#10b981';
-              sourceBadge.style.borderColor = '#10b981';
-              sourceBadge.style.background = 'rgba(16, 185, 129, 0.15)';
+            // Start hardware sensors directly inside the user gesture
+            const started = await this.sensors.start();
+            if (started) {
+              this.isPhoneSensorsActive = true;
+              btnSensors.textContent = '⏹ Stop Phone Sensors';
+              btnSensors.className = 'btn btn-danger btn-block';
+              if (sourceBadge) {
+                sourceBadge.textContent = 'SOURCE: 📱 LIVE PHONE SENSORS';
+                sourceBadge.style.color = '#10b981';
+                sourceBadge.style.borderColor = '#10b981';
+                sourceBadge.style.background = 'rgba(16, 185, 129, 0.15)';
+              }
+            } else {
+              console.warn('[IDR] sensors.start() returned false');
+              alert('Could not start live phone sensors. Please ensure Location and Motion permissions are allowed in Chrome settings.');
             }
           } else {
-            alert('Sensor permissions (DeviceMotion/Geolocation) required for live mobile Dead Reckoning.\n\nNote: Android Chrome requires HTTPS or localhost for sensor APIs.');
+            this.sensors.stop();
+            this.isPhoneSensorsActive = false;
+            btnSensors.textContent = '📱 Start Live Phone IMU+GNSS';
+            btnSensors.className = 'btn btn-block';
+            if (sourceBadge) {
+              sourceBadge.textContent = 'SOURCE: ⏸️ STANDBY';
+              sourceBadge.style.color = 'var(--text-secondary)';
+              sourceBadge.style.borderColor = 'var(--bg-card-border)';
+              sourceBadge.style.background = 'rgba(148, 163, 184, 0.15)';
+            }
           }
-        } else {
-          this.sensors.stop();
-          this.isPhoneSensorsActive = false;
-          btnSensors.textContent = '📱 Start Live Phone IMU+GNSS';
-          btnSensors.className = 'btn btn-block';
-          if (sourceBadge) {
-            sourceBadge.textContent = 'SOURCE: ⏸️ STANDBY';
-            sourceBadge.style.color = 'var(--text-secondary)';
-            sourceBadge.style.borderColor = 'var(--bg-card-border)';
-            sourceBadge.style.background = 'rgba(148, 163, 184, 0.15)';
-          }
+        } catch (err) {
+          console.error('[IDR] Error during sensor toggle:', err);
+          alert('Error toggling phone sensors: ' + (err && err.message ? err.message : err));
         }
       };
     }
@@ -251,6 +261,77 @@ class IDRApp {
     }
     if (text) {
       text.textContent = connected ? 'ENGINE LIVE' : 'CONNECTING...';
+    }
+  }
+
+  _onSensorTelemetry(telem) {
+    if (!telem) return;
+
+    // Secure Context Badge
+    const secBadge = document.getElementById('hw-secure-badge');
+    if (secBadge) {
+      if (telem.isSecureContext) {
+        secBadge.textContent = 'SECURE CTX';
+        secBadge.style.color = '#10b981';
+      } else {
+        secBadge.textContent = 'INSECURE HTTP';
+        secBadge.style.color = '#f59e0b';
+      }
+    }
+
+    // Accel
+    const accelEl = document.getElementById('hw-accel-status');
+    if (accelEl) {
+      if (telem.accel.hasData) {
+        accelEl.textContent = `● ${telem.accel.rateHz} Hz`;
+        accelEl.style.color = '#10b981';
+      } else {
+        accelEl.textContent = '○ NO DATA';
+        accelEl.style.color = 'var(--text-muted)';
+      }
+    }
+
+    // Gyro
+    const gyroEl = document.getElementById('hw-gyro-status');
+    if (gyroEl) {
+      if (telem.gyro.hasData) {
+        gyroEl.textContent = `● ${telem.gyro.rateHz} Hz`;
+        gyroEl.style.color = '#10b981';
+      } else {
+        gyroEl.textContent = '○ NO DATA';
+        gyroEl.style.color = 'var(--text-muted)';
+      }
+    }
+
+    // Orientation / Compass
+    const oriEl = document.getElementById('hw-ori-status');
+    if (oriEl) {
+      if (telem.orientation.hasData) {
+        oriEl.textContent = `● ${telem.orientation.rateHz} Hz`;
+        oriEl.style.color = '#10b981';
+      } else {
+        oriEl.textContent = '○ NO DATA';
+        oriEl.style.color = 'var(--text-muted)';
+      }
+    }
+
+    // GNSS
+    const gnssEl = document.getElementById('hw-gnss-status');
+    if (gnssEl) {
+      if (telem.gnss.status === 'FIX') {
+        const accStr = telem.gnss.accuracy_m ? ` (±${Math.round(telem.gnss.accuracy_m)}m)` : '';
+        gnssEl.textContent = `● FIX${accStr}`;
+        gnssEl.style.color = '#10b981';
+      } else if (telem.gnss.status === 'SEARCHING') {
+        gnssEl.textContent = '⏳ SEARCHING';
+        gnssEl.style.color = '#f59e0b';
+      } else if (telem.gnss.status === 'DENIED') {
+        gnssEl.textContent = '✖ DENIED';
+        gnssEl.style.color = '#f43f5e';
+      } else {
+        gnssEl.textContent = '○ NO FIX';
+        gnssEl.style.color = 'var(--text-muted)';
+      }
     }
   }
 

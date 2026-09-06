@@ -78,6 +78,37 @@
         📱 Start Live Phone IMU+GNSS
       </button>
 
+      <!-- Live Phone Hardware Sensor Matrix -->
+      <div style="background: rgba(0,0,0,0.35); border: 1px solid var(--bg-card-border); border-radius: var(--radius-md); padding: 8px 10px; margin-top: 6px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <span style="font-size: 0.68rem; font-weight: 800; color: var(--text-secondary); text-transform: uppercase;">📡 Phone Sensor Hardware Matrix</span>
+          <span id="hw-secure-badge" style="font-size: 0.6rem; font-weight: 700; color: var(--emerald-accent);">SECURE CTX</span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 0.72rem;">
+          <!-- Accel -->
+          <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); padding: 4px 6px; border-radius: 4px;">
+            <span>ACCEL:</span>
+            <span id="hw-accel-status" style="font-family: monospace; font-weight: 700; color: var(--text-muted);">○ NO DATA</span>
+          </div>
+          <!-- Gyro -->
+          <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); padding: 4px 6px; border-radius: 4px;">
+            <span>GYRO:</span>
+            <span id="hw-gyro-status" style="font-family: monospace; font-weight: 700; color: var(--text-muted);">○ NO DATA</span>
+          </div>
+          <!-- Orientation -->
+          <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); padding: 4px 6px; border-radius: 4px;">
+            <span>COMPASS:</span>
+            <span id="hw-ori-status" style="font-family: monospace; font-weight: 700; color: var(--text-muted);">○ NO DATA</span>
+          </div>
+          <!-- GNSS -->
+          <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); padding: 4px 6px; border-radius: 4px;">
+            <span>GNSS:</span>
+            <span id="hw-gnss-status" style="font-family: monospace; font-weight: 700; color: var(--text-muted);">○ NO FIX</span>
+          </div>
+        </div>
+      </div>
+
       <!-- Four USPs Quick Bar -->
       <div class="usp-bar" style="margin-top: 6px;">
         <!-- USP 1 -->

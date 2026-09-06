@@ -122,3 +122,22 @@ def test_websocket_streaming(client):
         assert res["type"] == "nav_state"
         assert "latitude" in res["state"]
         assert "forward_speed_mps" in res["state"]
+
+        # Regression Test: Partial mobile frame (IMU-only during tunnel/blackout or startup)
+        ws.send_json({
+            "type": "sensor_frame",
+            "imu": {
+                "timestamp": 1.02,
+                "acc_x": 0.2,
+                "acc_y": 0.0,
+                "acc_z": 9.81,
+                "gyro_x": 0.0,
+                "gyro_y": 0.0,
+                "gyro_z": 0.0,
+            },
+            "gnss": None,
+        })
+        res2 = ws.receive_json()
+        assert res2["type"] == "nav_state"
+        assert res2["state"]["is_in_blackout"] or not res2["state"]["is_in_blackout"]
+

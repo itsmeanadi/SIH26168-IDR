@@ -63,21 +63,29 @@ class IDREngineClient {
   }
 
   sendSensorFrame(imu, gnss) {
-    if (!this.isConnected || !this.socket) {
-      // Fallback: send via REST if socket not yet open
+    if (!this.isConnected || !this.socket || this.socket.readyState !== WebSocket.OPEN) {
+      // Fallback: send via REST if socket not yet open or reconnecting
       return this._sendRestFrame(imu, gnss);
     }
-    const payload = JSON.stringify({
-      type: 'sensor_frame',
-      imu: imu,
-      gnss: gnss,
-    });
-    this.socket.send(payload);
+    try {
+      const payload = JSON.stringify({
+        type: 'sensor_frame',
+        imu: imu,
+        gnss: gnss,
+      });
+      this.socket.send(payload);
+    } catch (err) {
+      this._sendRestFrame(imu, gnss);
+    }
   }
 
   sendCommand(cmd, params = {}) {
-    if (this.isConnected && this.socket) {
-      this.socket.send(JSON.stringify({ type: 'command', cmd, ...params }));
+    if (this.isConnected && this.socket && this.socket.readyState === WebSocket.OPEN) {
+      try {
+        this.socket.send(JSON.stringify({ type: 'command', cmd, ...params }));
+      } catch (err) {
+        console.warn('Could not send WebSocket command:', err);
+      }
     }
   }
 
