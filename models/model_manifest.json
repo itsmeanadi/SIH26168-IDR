@@ -1,0 +1,45 @@
+{
+  "manifest_version": "1.0.0",
+  "generated_at": "2026-09-07T22:12:00Z",
+  "models": [
+    {
+      "model_name": "VelocityEstimatorNet",
+      "checkpoint_file": "models/velocity_net.pt",
+      "architecture": "1D-CNN + GRU",
+      "authenticity": "historical_synthetic",
+      "is_scientific_research_valid": false,
+      "training_dataset_name": "IO-VNBD (Synthetic Mock Baseline)",
+      "training_drives": ["M", "S", "Vta", "Vtb", "Vw"],
+      "input_channels": 6,
+      "window_size": 50,
+      "target_description": "Vehicle forward speed (m/s)",
+      "notes": "Historical synthetic baseline. Must be retrained on authentic IO-VNBD for scientific claims."
+    },
+    {
+      "model_name": "IMUDenoiseNet",
+      "checkpoint_file": "models/imu_denoise_net.pt",
+      "architecture": "1D Dilated Residual CNN",
+      "authenticity": "historical_synthetic",
+      "is_scientific_research_valid": false,
+      "training_dataset_name": "IO-VNBD (Synthetic Mock Baseline)",
+      "training_drives": ["M", "S", "Vta", "Vtb", "Vw"],
+      "input_channels": 6,
+      "window_size": 50,
+      "target_description": "IMU noise/bias residual offset (m/s^2, rad/s)",
+      "notes": "Experimental prototype. Requires authentic 6-DOF reference IMU for supervised training."
+    },
+    {
+      "model_name": "KalmanNetGainEstimator",
+      "checkpoint_file": "models/kalmannet.pt",
+      "architecture": "GRU Neural Kalman Gain Estimator",
+      "authenticity": "historical_synthetic",
+      "is_scientific_research_valid": false,
+      "training_dataset_name": "Synthetic EKF Simulation",
+      "training_drives": ["Simulation"],
+      "input_channels": 6,
+      "window_size": 1,
+      "target_description": "Analytical Kalman gain approximation Kt",
+      "notes": "Experimental research prototype."
+    }
+  ]
+}

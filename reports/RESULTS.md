@@ -1,6 +1,10 @@
 # ISRO Smart India Hackathon (PS 26168): AI-ML Based Intelligent Dead Reckoning (IDR) System
 
-## 1. Executive Summary & Acceptance Verification
+> [!WARNING]
+> **PROVENANCE AUDIT NOTICE: HISTORICAL SYNTHETIC DEVELOPMENT BASELINE**  
+> An independent scientific audit confirmed that the results below were generated using locally generated synthetic mock data (`data/raw/categorised/`) and development evaluation scripts. These results serve as **software pipeline integration benchmarks**, not verified authentic real-world road performance. The repository has been re-architected with strict provenance safety gates (`ScientificEvaluator`, `TrainingSafetyGate`) for future authentic evaluation.
+
+## 1. Executive Summary & Acceptance Verification (Development Baseline)
 
 - **Primary Acceptance Criterion**: Dead-reckoning drift must remain strictly **< 10%** of distance travelled during complete GNSS denial.
 - **Dead-Reckoning Core Verification**: The dead-reckoning core alone (EKF + AI-Velocity + NHC) achieves **4.02% drift (46.32 m)** on the primary 1.0 km outage and a median drift of **9.18% across 443 diverse outage scenarios** **WITHOUT ANY MAP-MATCHING**.

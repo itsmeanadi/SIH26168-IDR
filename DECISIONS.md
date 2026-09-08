@@ -1,3 +1,10 @@
+# System Architecture & Design Decisions (SIH 26168)
+
+> [!WARNING]
+> **PROVENANCE AUDIT NOTICE: HISTORICAL SYNTHETIC DEVELOPMENT BASELINE**  
+> All numerical metrics referenced in these decision records (e.g., drift percentages, MAE values) reflect historical software pipeline simulation baselines on synthetic data. Performance on authentic road data has not yet been established.
+
+---
 # Architecture & Engineering Decisions (DECISIONS.md)
 *SIH PS 26168 (ISRO): AI-ML Intelligent Dead Reckoning (IDR)*
 

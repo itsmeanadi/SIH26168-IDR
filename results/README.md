@@ -1,6 +1,10 @@
 # AI-ML IDR System - Experimental Results & Visualizations
 
-This directory contains the complete quantitative and qualitative evaluation results for the **AI-ML Intelligent Dead Reckoning (IDR) System** (ISRO SIH Problem Statement 26168), evaluated across **443 distinct GNSS outage segments** over 7 real-world vehicle drives from the IO-VNBD dataset.
+> [!WARNING]
+> **PROVENANCE CLASSIFICATION: HISTORICAL SYNTHETIC BASELINE ONLY**  
+> An independent scientific audit has confirmed that the metrics in this document were generated using locally simulated synthetic mock data (`data/raw/categorised/`), where sensor inputs and orbits followed trigonometric formulations. These numbers represent **software verification and pipeline integration baselines**, NOT validated performance on authentic real-world road datasets. All future peer-reviewed/scientific benchmarks will be computed strictly on authentic datasets via the `ScientificEvaluator` harness.
+
+This directory contains the development evaluation results for the **AI-ML Intelligent Dead Reckoning (IDR) System** (ISRO SIH Problem Statement 26168).
 
 Detailed documentation: [RESULTS.md](RESULTS.md)  
 Machine-readable metrics: [eval_results.json](eval_results.json) | [eval_results_multiscenario.json](eval_results_multiscenario.json)

@@ -7,10 +7,11 @@
  * - Geolocation API (Latitude, Longitude, Altitude, Accuracy, Speed, Heading)
  *
  * Features:
- * - Independent per-sensor event tracking and observed rate computation
- * - Monotonic timestamp validation
- * - Secure context detection and helpful diagnostic alerts for Android Chrome
- * - Graceful partial sensor degradation (operates on available sensors without crashing)
+ * - Granular per-sensor status tracking:
+ *   ['NOT_INITIALIZED', 'PERMISSION_REQUIRED', 'PERMISSION_DENIED', 'INSECURE_CONTEXT', 'UNSUPPORTED', 'SEARCHING', 'ACTIVE_STREAMING', 'NO_SAMPLES']
+ * - Explicit user-gesture permission request for iOS 13+ and Android
+ * - Monotonic timestamp validation and observed Hz rate calculation
+ * - Insecure Context detection with actionable troubleshooting telemetry
  */
 
 class MobileSensorLayer {
@@ -19,7 +20,7 @@ class MobileSensorLayer {
     this.onTelemetryCallback = onTelemetryCallback;
     this.isActive = false;
 
-    // Normalization & throttling: target up to 50 Hz streaming
+    // Normalization & throttling: target 50 Hz
     this.lastImuTime = 0;
     this.sampleRateHz = 50;
     this.minIntervalMs = 1000 / this.sampleRateHz;
@@ -43,20 +44,23 @@ class MobileSensorLayer {
     this.latestGnss = null;
     this.geoWatchId = null;
 
-    // Real Hardware Event Metrics
+    // Granular Per-Sensor Telemetry
+    const isSec = typeof window !== 'undefined' && Boolean(window.isSecureContext);
     this.telemetry = {
-      isSecureContext: typeof window !== 'undefined' && Boolean(window.isSecureContext),
-      accel: { hasData: false, rateHz: 0, count: 0, lastTimestamp: 0, raw: [0, 0, 9.81] },
-      gyro: { hasData: false, rateHz: 0, count: 0, lastTimestamp: 0, raw: [0, 0, 0] },
-      orientation: { hasData: false, rateHz: 0, count: 0, lastTimestamp: 0, raw: [0, 0, 0] },
-      gnss: { hasData: false, status: 'STANDBY', rateHz: 0, count: 0, lastTimestamp: 0, accuracy_m: null, speed_mps: null },
+      isSecureContext: isSec,
+      overallStatus: 'STANDBY', // 'STANDBY' | 'INITIALIZING' | 'ACTIVE_STREAMING' | 'INSECURE_CONTEXT' | 'PERMISSION_DENIED'
+      totalSamplesReceived: 0,
+      accel: { status: isSec ? 'NOT_INITIALIZED' : 'INSECURE_CONTEXT', hasData: false, rateHz: 0, count: 0, lastTimestamp: 0, raw: [0, 0, 9.81] },
+      gyro: { status: isSec ? 'NOT_INITIALIZED' : 'INSECURE_CONTEXT', hasData: false, rateHz: 0, count: 0, lastTimestamp: 0, raw: [0, 0, 0] },
+      orientation: { status: isSec ? 'NOT_INITIALIZED' : 'INSECURE_CONTEXT', hasData: false, rateHz: 0, count: 0, lastTimestamp: 0, raw: [0, 0, 0] },
+      gnss: { status: isSec ? 'STANDBY' : 'INSECURE_CONTEXT', hasData: false, rateHz: 0, count: 0, lastTimestamp: 0, accuracy_m: null, speed_mps: null },
       timestampMonotonic: true,
       lastEventEpochSec: 0,
     };
 
     this._lastEventTimestamp = 0;
 
-    // Bind event handlers once to maintain clean references
+    // Bind event handlers
     this._handleMotion = this._handleMotion.bind(this);
     this._handleOrientation = this._handleOrientation.bind(this);
 
@@ -74,6 +78,15 @@ class MobileSensorLayer {
       this.telemetry.orientation.count = 0;
       this.telemetry.gnss.count = 0;
 
+      // Update overall streaming status based on real received data
+      if (this.telemetry.totalSamplesReceived > 0 && (this.telemetry.accel.rateHz > 0 || this.telemetry.gyro.rateHz > 0 || this.telemetry.gnss.hasData)) {
+        this.telemetry.overallStatus = 'ACTIVE_STREAMING';
+      } else if (!this.telemetry.isSecureContext) {
+        this.telemetry.overallStatus = 'INSECURE_CONTEXT';
+      } else if (this.isActive) {
+        this.telemetry.overallStatus = 'WAITING_FOR_SAMPLES';
+      }
+
       this._emitTelemetry();
     }, 1000);
   }
@@ -89,17 +102,22 @@ class MobileSensorLayer {
   }
 
   async requestPermissions() {
-    // 1. Check Secure Context
-    if (typeof window !== 'undefined' && !window.isSecureContext) {
-      console.warn('Insecure context detected! Android Chrome restricts sensors on plain HTTP LAN.');
+    const isSec = typeof window !== 'undefined' && Boolean(window.isSecureContext);
+    this.telemetry.isSecureContext = isSec;
+
+    if (!isSec) {
+      console.warn('[IDR] Insecure context: Web browser restrictions apply for DeviceMotion and Geolocation on LAN HTTP.');
     }
 
-    // 2. iOS 13+ DeviceMotionEvent permission requirement
+    // 1. iOS 13+ DeviceMotionEvent permission requirement
     if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
       try {
         const response = await DeviceMotionEvent.requestPermission();
         if (response !== 'granted') {
           console.warn('DeviceMotionEvent permission denied by user.');
+          this.telemetry.accel.status = 'PERMISSION_DENIED';
+          this.telemetry.gyro.status = 'PERMISSION_DENIED';
+          this._emitTelemetry();
           return false;
         }
       } catch (err) {
@@ -107,7 +125,7 @@ class MobileSensorLayer {
       }
     }
 
-    // 3. DeviceOrientation permission
+    // 2. iOS 13+ DeviceOrientationEvent permission requirement
     if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
       try {
         await DeviceOrientationEvent.requestPermission();
@@ -119,66 +137,101 @@ class MobileSensorLayer {
 
   async start() {
     try {
-      const granted = await this.requestPermissions();
-      if (!granted) return false;
-
       this.isActive = true;
+      this.telemetry.overallStatus = 'INITIALIZING';
+      this.telemetry.totalSamplesReceived = 0;
+      this.telemetry.accel.status = 'SEARCHING';
+      this.telemetry.gyro.status = 'SEARCHING';
+      this.telemetry.orientation.status = 'SEARCHING';
       this.telemetry.gnss.status = 'SEARCHING';
       this._emitTelemetry();
 
+      const granted = await this.requestPermissions();
+      if (!granted) {
+        this.telemetry.overallStatus = 'PERMISSION_DENIED';
+        this._emitTelemetry();
+        return false;
+      }
+
       // 1. Motion Listener (Accelerometer + Gyroscope)
-      window.addEventListener('devicemotion', this._handleMotion, { passive: true });
+      if (typeof window !== 'undefined' && 'ondevicemotion' in window) {
+        window.addEventListener('devicemotion', this._handleMotion, { passive: true });
+      } else {
+        this.telemetry.accel.status = 'UNSUPPORTED';
+        this.telemetry.gyro.status = 'UNSUPPORTED';
+      }
 
       // 2. Orientation Listener (Compass / Euler)
-      window.addEventListener('deviceorientation', this._handleOrientation, { passive: true });
+      // Listen to both deviceorientationabsolute (Android Chrome absolute geomagnetic) and deviceorientation (standard)
+      if (typeof window !== 'undefined') {
+        if ('ondeviceorientationabsolute' in window) {
+          window.addEventListener('deviceorientationabsolute', this._handleOrientation, { passive: true });
+        }
+        if ('ondeviceorientation' in window) {
+          window.addEventListener('deviceorientation', this._handleOrientation, { passive: true });
+        }
+      } else {
+        this.telemetry.orientation.status = 'UNSUPPORTED';
+      }
 
       // 3. Geolocation Watcher
-      if ('geolocation' in navigator) {
+      if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
         this.geoWatchId = navigator.geolocation.watchPosition(
           (pos) => this._handleGeolocation(pos),
           (err) => {
-            console.warn('[IDR] Geolocation watch status:', err.code, err.message);
+            console.warn('[IDR] Geolocation watch error:', err.code, err.message);
             if (err.code === 1) {
-              this.telemetry.gnss.status = 'DENIED';
+              this.telemetry.gnss.status = 'PERMISSION_DENIED';
             } else if (err.code === 2) {
               this.telemetry.gnss.status = 'UNAVAILABLE';
+            } else if (err.code === 3) {
+              this.telemetry.gnss.status = 'TIMEOUT';
             } else {
-              this.telemetry.gnss.status = 'SEARCHING';
+              this.telemetry.gnss.status = 'ERROR';
             }
             this._emitTelemetry();
           },
           {
             enableHighAccuracy: true,
-            maximumAge: 1000,
-            timeout: 10000,
+            maximumAge: 3000,
+            timeout: 27000,
           }
         );
       } else {
         this.telemetry.gnss.status = 'UNSUPPORTED';
-        this._emitTelemetry();
       }
 
+      this._emitTelemetry();
       return true;
     } catch (err) {
       console.error('[IDR] Error in MobileSensorLayer.start():', err);
+      this.telemetry.overallStatus = 'ERROR';
+      this._emitTelemetry();
       return false;
     }
   }
 
   stop() {
     this.isActive = false;
-    window.removeEventListener('devicemotion', this._handleMotion);
-    window.removeEventListener('deviceorientation', this._handleOrientation);
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('devicemotion', this._handleMotion);
+      window.removeEventListener('deviceorientation', this._handleOrientation);
+      window.removeEventListener('deviceorientationabsolute', this._handleOrientation);
+    }
 
-    if (this.geoWatchId !== null && 'geolocation' in navigator) {
+    if (this.geoWatchId !== null && typeof navigator !== 'undefined' && 'geolocation' in navigator) {
       navigator.geolocation.clearWatch(this.geoWatchId);
       this.geoWatchId = null;
     }
 
+    this.telemetry.overallStatus = 'STANDBY';
     this.telemetry.accel.hasData = false;
     this.telemetry.gyro.hasData = false;
     this.telemetry.orientation.hasData = false;
     this.telemetry.gnss.hasData = false;
+    this.telemetry.accel.status = 'STANDBY';
+    this.telemetry.gyro.status = 'STANDBY';
+    this.telemetry.orientation.status = 'STANDBY';
     this.telemetry.gnss.status = 'STANDBY';
     this.telemetry.accel.rateHz = 0;
     this.telemetry.gyro.rateHz = 0;
@@ -194,16 +247,17 @@ class MobileSensorLayer {
     const tNow = performance.now();
     const epochSec = Date.now() / 1000.0;
 
-    // Check Monotonicity
     if (this._lastEventTimestamp > 0 && tNow < this._lastEventTimestamp) {
       this.telemetry.timestampMonotonic = false;
     }
     this._lastEventTimestamp = tNow;
     this.telemetry.lastEventEpochSec = epochSec;
 
+    let hasValidData = false;
+
     // 1. Accelerometer
     const acc = event.accelerationIncludingGravity || event.acceleration;
-    if (acc) {
+    if (acc && acc.x !== null && acc.y !== null && acc.z !== null && acc.x !== undefined && acc.y !== undefined && acc.z !== undefined) {
       const ax = Number(acc.x);
       const ay = Number(acc.y);
       const az = Number(acc.z);
@@ -212,30 +266,36 @@ class MobileSensorLayer {
         this.latestImu.acc_y = ay;
         this.latestImu.acc_z = az;
         this.telemetry.accel.hasData = true;
+        this.telemetry.accel.status = 'ACTIVE';
         this.telemetry.accel.count++;
         this.telemetry.accel.lastTimestamp = epochSec;
         this.telemetry.accel.raw = [ax, ay, az];
+        this.telemetry.totalSamplesReceived++;
+        hasValidData = true;
       }
     }
 
     // 2. Gyroscope (rotationRate provides degrees/sec -> convert to rad/s)
     const rot = event.rotationRate;
     const DEG_TO_RAD = Math.PI / 180.0;
-    if (rot) {
-      const gx = Number(rot.beta);
-      const gy = Number(rot.gamma);
-      const gz = Number(rot.alpha);
+    if (rot && (rot.alpha !== null || rot.beta !== null || rot.gamma !== null)) {
+      const gx = rot.beta !== null && rot.beta !== undefined ? Number(rot.beta) : 0.0;
+      const gy = rot.gamma !== null && rot.gamma !== undefined ? Number(rot.gamma) : 0.0;
+      const gz = rot.alpha !== null && rot.alpha !== undefined ? Number(rot.alpha) : 0.0;
       if (Number.isFinite(gx) && Number.isFinite(gy) && Number.isFinite(gz)) {
-        // Android W3C standard: beta=pitch (X), gamma=roll (Y), alpha=yaw (Z)
         this.latestImu.gyro_x = gx * DEG_TO_RAD;
         this.latestImu.gyro_y = gy * DEG_TO_RAD;
         this.latestImu.gyro_z = gz * DEG_TO_RAD;
         this.telemetry.gyro.hasData = true;
+        this.telemetry.gyro.status = 'ACTIVE';
         this.telemetry.gyro.count++;
         this.telemetry.gyro.lastTimestamp = epochSec;
         this.telemetry.gyro.raw = [gx, gy, gz];
+        hasValidData = true;
       }
     }
+
+    if (!hasValidData) return;
 
     // Throttle frame rate for WebSocket transmission (target 50 Hz)
     if (tNow - this.lastImuTime < this.minIntervalMs) return;
@@ -254,22 +314,38 @@ class MobileSensorLayer {
   }
 
   _handleOrientation(event) {
-    if (!this.isActive) return;
+    if (!this.isActive || !event) return;
 
-    if (event.alpha !== null && event.alpha !== undefined) {
-      const yaw = Number(event.alpha);
-      const pitch = Number(event.beta || 0);
-      const roll = Number(event.gamma || 0);
-      if (Number.isFinite(yaw) && Number.isFinite(pitch) && Number.isFinite(roll)) {
-        this.latestImu.orientation_yaw = yaw;     // Compass yaw [0, 360]
-        this.latestImu.orientation_pitch = pitch; // Front/back tilt [-180, 180]
-        this.latestImu.orientation_roll = roll;   // Left/right roll [-90, 90]
+    let compassHeading = null;
+    const isAbsolute = Boolean(event.absolute);
+    const alpha = event.alpha !== null && event.alpha !== undefined ? Number(event.alpha) : null;
+    const beta = event.beta !== null && event.beta !== undefined ? Number(event.beta) : 0.0;
+    const gamma = event.gamma !== null && event.gamma !== undefined ? Number(event.gamma) : 0.0;
 
-        this.telemetry.orientation.hasData = true;
-        this.telemetry.orientation.count++;
-        this.telemetry.orientation.lastTimestamp = Date.now() / 1000.0;
-        this.telemetry.orientation.raw = [yaw, pitch, roll];
-      }
+    if (event.webkitCompassHeading !== undefined && event.webkitCompassHeading !== null) {
+      // iOS WebKit: provides true/magnetic compass heading directly (0=North, 90=East, clockwise)
+      compassHeading = Number(event.webkitCompassHeading);
+    } else if (alpha !== null && Number.isFinite(alpha)) {
+      // W3C DeviceOrientation (Android Chrome / Standard):
+      // alpha is degrees counter-clockwise from North [0..360).
+      // Convert to Clockwise Geographic Compass Heading: H = (360 - alpha) % 360
+      compassHeading = (360.0 - alpha) % 360.0;
+      if (compassHeading < 0) compassHeading += 360.0;
+    }
+
+    if (compassHeading !== null && Number.isFinite(compassHeading) && Number.isFinite(beta) && Number.isFinite(gamma)) {
+      this.latestImu.orientation_yaw = compassHeading;
+      this.latestImu.orientation_pitch = beta;
+      this.latestImu.orientation_roll = gamma;
+
+      this.telemetry.orientation.hasData = true;
+      this.telemetry.orientation.status = 'ACTIVE';
+      this.telemetry.orientation.count++;
+      this.telemetry.orientation.lastTimestamp = Date.now() / 1000.0;
+      this.telemetry.orientation.raw = [compassHeading, beta, gamma];
+      this.telemetry.orientation.rawAlpha = alpha;
+      this.telemetry.orientation.isAbsolute = isAbsolute;
+      this.telemetry.orientation.hasWebkitHeading = event.webkitCompassHeading !== undefined && event.webkitCompassHeading !== null;
     }
   }
 
@@ -295,6 +371,7 @@ class MobileSensorLayer {
     this.telemetry.gnss.lastTimestamp = epochSec;
     this.telemetry.gnss.accuracy_m = coords.accuracy;
     this.telemetry.gnss.speed_mps = coords.speed;
+    this.telemetry.totalSamplesReceived++;
 
     this._emitTelemetry();
   }

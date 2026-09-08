@@ -1,0 +1,11 @@
+dataset_name: field-motorcycle-telemetry
+source: "IDR Onboard Android Telemetry Recorder"
+authenticity: field
+vehicle_type: two_wheeler_motorcycle
+sensor_type: android_high_rate_imu_and_gnss_raw
+sampling_rate_hz: 50.0
+ground_truth_type: dual_frequency_gnss_carrier_phase_or_reference_fix
+license_status: proprietary_internal_field
+preprocessing_version: "2.0.0"
+data_path: data/field/motorcycle
+notes: "Real field data collected on test motorcycle routes using Android high-rate telemetry session logger."

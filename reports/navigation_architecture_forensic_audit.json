@@ -1,0 +1,92 @@
+{
+  "phase": "Phase 22 - Navigation Architecture & Attitude Forensic Audit",
+  "verdict": "NAVIGATION ARCHITECTURE LIMITED \u2014 REDESIGN REQUIRED BEFORE FURTHER TUNING",
+  "verdict_code": "B",
+  "summary": {
+    "9_state_ekf_status": "MATHEMATICALLY_LIMITED",
+    "attitude_representation": "SCALAR_YAW_ONLY",
+    "roll_pitch_states": false,
+    "gravity_compensation": "SCALAR_PITCH_PROJECTION_INSUFFICIENT_FOR_3D",
+    "alignment_status": "CALIBRATION_REQUIRED_FOR_RAW_PHONE_AXES",
+    "heading_drift_root_cause": "PRE_BLACKOUT_COG_WANDER_AND_UNOBSERVED_GYRO_INTEGRATION",
+    "ai_measurement_model_validity": "MATHEMATICALLY_VALID_BODY_FRAME_PROJECTION"
+  },
+  "ekf_audit": {
+    "state_vector": [
+      "pos_east",
+      "pos_north",
+      "pos_up",
+      "vel_east",
+      "vel_north",
+      "vel_up",
+      "yaw_psi",
+      "accel_bias_ba",
+      "gyro_bias_bw"
+    ],
+    "dimension": 9,
+    "estimates_roll": false,
+    "estimates_pitch": false,
+    "estimates_3d_attitude": false,
+    "gyro_axes_used": "1D_yaw_rate_only",
+    "accel_axes_used": "1D_forward_accel_only",
+    "bias_representation": "1D_scalar_accel_and_1D_scalar_gyro",
+    "motorcycle_lean_handling": "NONE_GRAVITY_LEAKS_TO_HORIZONTAL",
+    "curved_motion_handling": "CENTRIPETAL_TERM_PRESENT_BUT_ASSUMES_ZERO_ROLL"
+  },
+  "alignment_audit": {
+    "phone_mount_angle_deg": 130.2,
+    "phone_x_to_vehicle_forward_factor": -0.646,
+    "phone_y_to_vehicle_forward_factor": -0.763,
+    "raw_accel_feeding_error": "Feeding raw phone ax without Rp2v feeds only -64.6% forward and generates phantom lateral accel",
+    "calibration_requirement": "Mandatory PhoneToVehicleAligner rotation before EKF mechanization"
+  },
+  "gravity_audit": {
+    "uncompensated_pitch_10deg_acc_leakage_mps2": 1.703,
+    "uncompensated_pitch_10deg_30s_drift_m": 766.3,
+    "uncompensated_roll_30deg_acc_leakage_mps2": 4.903,
+    "uncompensated_roll_30deg_30s_drift_m": 2206.5,
+    "conclusion": "Full 3D attitude (quaternion / DCM) is indispensable for two-wheeler lean dynamics"
+  },
+  "yaw_drift_audit": {
+    "initial_heading_deg": 122.28,
+    "blackout_entry_heading_ekf_deg": 36.81,
+    "blackout_entry_heading_gt_deg": 122.28,
+    "initial_heading_discrepancy_deg": -85.47,
+    "gyro_drift_rate_deg_per_sec": 2.44,
+    "blackout_exit_heading_ekf_deg": 110.02,
+    "blackout_exit_heading_gt_deg": 122.42,
+    "blackout_exit_heading_discrepancy_deg": -12.4,
+    "root_cause": "Pre-blackout COG GPS noise at zero speed injected -85 deg heading error into EKF prior to outage"
+  },
+  "ai_velocity_audit": {
+    "frame": "vehicle_body_forward_scalar",
+    "measurement_equation": "z = v_fwd_est",
+    "prediction_equation": "h(x) = cos(psi)*vE + sin(psi)*vN",
+    "jacobian_correct": true,
+    "synthetic_angle_tests_passed": true
+  },
+  "nhc_audit": {
+    "constraints": [
+      "v_lat ~= 0",
+      "v_up ~= 0"
+    ],
+    "validity": "Helps suppress side-slip in 2D car cruising, but breaks during motorcycle banking and road slopes if roll/pitch are unmodeled"
+  },
+  "zaru_audit": {
+    "state_constrained": "gyro_yaw_bias",
+    "activation": "Stationary only (multi-sensor speed + variance gating)",
+    "validity": "Accurate and safe after Phase 21 moving-state fix"
+  },
+  "recommended_architecture": {
+    "target_filter": "15-State Error-State Kalman Filter (ES-EKF)",
+    "target_states": [
+      "delta_position_enu_3D",
+      "delta_velocity_enu_3D",
+      "delta_attitude_angles_3D",
+      "accel_bias_3D",
+      "gyro_bias_3D"
+    ],
+    "attitude_tracking": "Unit Quaternion (SO3) at high rate (100 Hz)",
+    "gravity_removal": "Full 3D DCM world gravity subtraction: a_world = R_b2w @ a_body - [0, 0, g]^T"
+  }
+}

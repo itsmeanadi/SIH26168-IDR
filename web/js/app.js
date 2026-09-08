@@ -1,6 +1,6 @@
 /**
- * Master Application Controller.
- * Wires together SensorLayer, EngineClient, MapLayer, and DiagnosticUI.
+ * Master Application Controller for IDR Navigation.
+ * Manages Screen Navigation, Mobile Bottom Sheet Interaction, Sensor Readiness Guard, Live & Replay Operations, Diagnostics, and Trip Summary.
  */
 
 class IDRApp {
@@ -13,17 +13,40 @@ class IDRApp {
       (telem) => this._onSensorTelemetry(telem)
     );
 
-    this.isPhoneSensorsActive = false;
+    this.currentScreen = 'home'; // 'home' | 'nav'
+    this.currentMode = 'standby'; // 'standby' | 'live' | 'replay'
+    this.selectedDrive = 'Vf';
     this.vehicleType = 'two_wheeler';
     this.isBlackoutSimulated = false;
-    this.isRecording = false;
-    this.recStartTime = null;
-    this.recTimer = null;
+    this.isPhoneSensorsActive = false;
+    this.isEngineConnected = false;
+
+    // DOM Elements
+    this.appHeader = document.getElementById('app-header');
+    this.screenHome = document.getElementById('screen-home');
+    this.screenNav = document.getElementById('screen-nav');
+    this.bottomSheet = document.getElementById('nav-bottom-sheet');
+    this.sheetHandle = document.getElementById('sheet-drag-handle');
+    this.provenancePill = document.getElementById('provenance-pill');
+    this.provenanceText = document.getElementById('provenance-text');
+    this.replayPanel = document.getElementById('replay-controls-panel');
+    
+    // Status Grid Elements on Home
+    this.statEngineStateEl = document.getElementById('stat-engine-state');
+    this.statSensorsStateEl = document.getElementById('stat-sensors-state');
+    this.statReplayStateEl = document.getElementById('stat-replay-state');
+
+    // Modals
+    this.sensorGuideModal = document.getElementById('modal-sensor-guide');
+    this.readinessModal = document.getElementById('modal-sensor-readiness');
+    this.readinessImuEl = document.getElementById('readiness-imu-status');
+    this.readinessGpsEl = document.getElementById('readiness-gps-status');
+    this.readinessSecEl = document.getElementById('readiness-sec-status');
   }
 
   async init() {
-    console.log('Initializing IDR Application...');
-    
+    console.log('[IDR] Initializing Navigation Product...');
+
     // 1. Initialize Map
     this.map.init(28.6139, 77.2090);
 
@@ -36,10 +59,17 @@ class IDRApp {
     // 3. Bind UI Controls
     this._bindControls();
 
-    // 4. Load initial blackspots
+    // 4. Initial Health & Blackspots Load
+    this._refreshSystemHealth();
     this._refreshBlackspots();
 
-    // 5. Register PWA Service Worker
+    // 5. Populate guide URLs
+    this._populateGuideUrls();
+
+    // 6. Update Initial Home Subsystem States
+    this._updateHomeStatusSemantics();
+
+    // 7. Register Service Worker
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/service-worker.js').catch((err) => {
         console.log('ServiceWorker registration optional:', err);
@@ -47,10 +77,186 @@ class IDRApp {
     }
   }
 
+  _populateGuideUrls() {
+    const origin = window.location.origin;
+    const flagUrlEl = document.getElementById('guide-flag-url');
+    const httpsUrlEl = document.getElementById('guide-https-url');
+
+    if (flagUrlEl) flagUrlEl.textContent = origin;
+    if (httpsUrlEl) {
+      const host = window.location.hostname;
+      const port = window.location.port || '8000';
+      httpsUrlEl.textContent = `https://${host}:${port}`;
+    }
+  }
+
+  _updateHomeStatusSemantics() {
+    // Engine Subsystem
+    if (this.statEngineStateEl) {
+      if (this.isEngineConnected) {
+        this.statEngineStateEl.innerHTML = '<span class="beacon-mini emerald"></span><span>Online</span>';
+      } else {
+        this.statEngineStateEl.innerHTML = '<span class="beacon-mini amber"></span><span>Connecting...</span>';
+      }
+    }
+
+    // Live Sensors Subsystem
+    if (this.statSensorsStateEl) {
+      const isSec = this.sensors.telemetry.isSecureContext;
+      const totalSamples = this.sensors.telemetry.totalSamplesReceived;
+      const rateHz = this.sensors.telemetry.accel.rateHz || 0;
+
+      if (totalSamples > 0 && rateHz > 0) {
+        this.statSensorsStateEl.innerHTML = `<span class="beacon-mini emerald"></span><span>Streaming (${rateHz} Hz)</span>`;
+      } else if (!isSec) {
+        this.statSensorsStateEl.innerHTML = '<span class="beacon-mini amber"></span><span>Insecure HTTP</span>';
+      } else if (this.isPhoneSensorsActive) {
+        this.statSensorsStateEl.innerHTML = '<span class="beacon-mini amber"></span><span>Waiting for Data</span>';
+      } else {
+        this.statSensorsStateEl.innerHTML = '<span class="beacon-mini gray"></span><span>Not Active</span>';
+      }
+    }
+
+    // Replay Subsystem (always ready)
+    if (this.statReplayStateEl) {
+      this.statReplayStateEl.innerHTML = '<span class="beacon-mini emerald"></span><span>Ready</span>';
+    }
+  }
+
+  switchScreen(screenName) {
+    this.currentScreen = screenName;
+    if (screenName === 'home') {
+      if (this.appHeader) this.appHeader.style.display = 'flex';
+      if (this.screenHome) this.screenHome.classList.add('active');
+      if (this.screenNav) this.screenNav.classList.remove('active');
+      this._updateHomeStatusSemantics();
+    } else if (screenName === 'nav') {
+      if (this.appHeader) this.appHeader.style.display = 'none'; // Edge-to-edge immersive map
+      if (this.screenHome) this.screenHome.classList.remove('active');
+      if (this.screenNav) this.screenNav.classList.add('active');
+      this.diag.resetSession();
+      this.map.invalidateSize();
+    }
+  }
+
+  setProvenance(mode, label = '') {
+    this.currentMode = mode;
+    if (this.diag) {
+      this.diag.setMode(mode, label);
+    }
+    if (!this.provenancePill || !this.provenanceText) return;
+
+    this.provenancePill.className = 'status-pill';
+    if (mode === 'live') {
+      if (this.sensors.telemetry.totalSamplesReceived > 0) {
+        this.provenancePill.classList.add('live');
+        const hz = this.sensors.telemetry.accel.rateHz || 50;
+        this.provenanceText.textContent = `Live (${hz} Hz)`;
+      } else if (!this.sensors.telemetry.isSecureContext) {
+        this.provenancePill.classList.add('standby');
+        this.provenanceText.textContent = 'Sensors Blocked (HTTP)';
+      } else {
+        this.provenancePill.classList.add('standby');
+        this.provenanceText.textContent = 'Initializing Sensors...';
+      }
+      if (this.replayPanel) this.replayPanel.style.display = 'none';
+    } else if (mode === 'replay') {
+      this.provenancePill.classList.add('replay');
+      this.provenanceText.textContent = `Replay: ${label || this.selectedDrive}`;
+      if (this.replayPanel) this.replayPanel.style.display = 'block';
+    } else {
+      this.provenancePill.classList.add('standby');
+      this.provenanceText.textContent = 'Standby';
+      if (this.replayPanel) this.replayPanel.style.display = 'none';
+    }
+  }
+
   _bindControls() {
-    // Vehicle Profile Toggle
-    const btnBike = document.getElementById('btn-profile-bike');
-    const btnCar = document.getElementById('btn-profile-car');
+    // ── Header Controls ──
+    const btnHeaderHome = document.getElementById('btn-header-home');
+    if (btnHeaderHome) {
+      btnHeaderHome.onclick = () => this.switchScreen('home');
+    }
+
+    const btnHeaderDiag = document.getElementById('btn-header-diag');
+    if (btnHeaderDiag) {
+      btnHeaderDiag.onclick = () => this.diag.showDiagnosticsModal();
+    }
+
+    const btnHomeDiagLink = document.getElementById('btn-home-diag-link');
+    if (btnHomeDiagLink) {
+      btnHomeDiagLink.onclick = () => this.diag.showDiagnosticsModal();
+    }
+
+    const btnNavBackHome = document.getElementById('btn-nav-back-home');
+    if (btnNavBackHome) {
+      btnNavBackHome.onclick = () => this.switchScreen('home');
+    }
+
+    const btnNavTelemetry = document.getElementById('btn-nav-telemetry');
+    if (btnNavTelemetry) {
+      btnNavTelemetry.onclick = () => this.diag.showDiagnosticsModal();
+    }
+
+    const btnSheetViewDiag = document.getElementById('btn-sheet-view-diag');
+    if (btnSheetViewDiag) {
+      btnSheetViewDiag.onclick = () => this.diag.showDiagnosticsModal();
+    }
+
+    // ── Bottom Sheet Expand / Collapse Interaction ──
+    if (this.sheetHandle && this.bottomSheet) {
+      this.sheetHandle.onclick = () => {
+        this.bottomSheet.classList.toggle('expanded');
+        this.bottomSheet.classList.toggle('collapsed');
+      };
+    }
+
+    // ── Home Screen CTAs ──
+    const btnStartLive = document.getElementById('btn-home-start-live');
+    if (btnStartLive) {
+      btnStartLive.onclick = async () => {
+        await this._handleStartLiveNavigation();
+      };
+    }
+
+    const btnStartReplay = document.getElementById('btn-home-start-replay');
+    if (btnStartReplay) {
+      btnStartReplay.onclick = async () => {
+        this.switchScreen('nav');
+        this.setProvenance('replay', this.selectedDrive);
+        await this._startJudgeReplayDemo(this.selectedDrive);
+      };
+    }
+
+    // ── Sensor Readiness Modal Controls ──
+    const btnCloseReadiness = document.getElementById('btn-close-readiness');
+    if (btnCloseReadiness) {
+      btnCloseReadiness.onclick = () => {
+        if (this.readinessModal) this.readinessModal.classList.remove('active');
+      };
+    }
+
+    const btnReadinessEnable = document.getElementById('btn-readiness-enable');
+    if (btnReadinessEnable) {
+      btnReadinessEnable.onclick = () => {
+        if (this.readinessModal) this.readinessModal.classList.remove('active');
+        if (this.sensorGuideModal) this.sensorGuideModal.classList.add('active');
+      };
+    }
+
+    const btnReadinessReplay = document.getElementById('btn-readiness-replay');
+    if (btnReadinessReplay) {
+      btnReadinessReplay.onclick = async () => {
+        if (this.readinessModal) this.readinessModal.classList.remove('active');
+        this.switchScreen('nav');
+        this.setProvenance('replay', this.selectedDrive);
+        await this._startJudgeReplayDemo(this.selectedDrive);
+      };
+    }
+
+    // ── Vehicle Profile Toggles ──
+    const btnBike = document.getElementById('btn-home-profile-bike');
+    const btnCar = document.getElementById('btn-home-profile-car');
 
     if (btnBike) {
       btnBike.onclick = () => {
@@ -72,127 +278,129 @@ class IDRApp {
       };
     }
 
-    // Phone Sensors Toggle (Mobile Live Sensing)
-    const btnSensors = document.getElementById('btn-toggle-sensors');
-    const sourceBadge = document.getElementById('data-source-badge');
+    // ── Scenario Chips ──
+    document.querySelectorAll('.scenario-chip').forEach((chip) => {
+      chip.onclick = () => {
+        document.querySelectorAll('.scenario-chip').forEach((c) => c.classList.remove('active'));
+        chip.classList.add('active');
+        this.selectedDrive = chip.dataset.drive || 'Vf';
+      };
+    });
 
-    if (btnSensors) {
-      btnSensors.onclick = async () => {
-        try {
-          if (!this.isPhoneSensorsActive) {
-            // Asynchronously pause any ongoing replay without blocking the user gesture
-            this.client.controlReplay('pause').catch((err) => console.warn('Replay pause non-critical notice:', err));
-
-            // Start hardware sensors directly inside the user gesture
-            const started = await this.sensors.start();
-            if (started) {
-              this.isPhoneSensorsActive = true;
-              btnSensors.textContent = '⏹ Stop Phone Sensors';
-              btnSensors.className = 'btn btn-danger btn-block';
-              if (sourceBadge) {
-                sourceBadge.textContent = 'SOURCE: 📱 LIVE PHONE SENSORS';
-                sourceBadge.style.color = '#10b981';
-                sourceBadge.style.borderColor = '#10b981';
-                sourceBadge.style.background = 'rgba(16, 185, 129, 0.15)';
-              }
-            } else {
-              console.warn('[IDR] sensors.start() returned false');
-              alert('Could not start live phone sensors. Please ensure Location and Motion permissions are allowed in Chrome settings.');
-            }
-          } else {
-            this.sensors.stop();
-            this.isPhoneSensorsActive = false;
-            btnSensors.textContent = '📱 Start Live Phone IMU+GNSS';
-            btnSensors.className = 'btn btn-block';
-            if (sourceBadge) {
-              sourceBadge.textContent = 'SOURCE: ⏸️ STANDBY';
-              sourceBadge.style.color = 'var(--text-secondary)';
-              sourceBadge.style.borderColor = 'var(--bg-card-border)';
-              sourceBadge.style.background = 'rgba(148, 163, 184, 0.15)';
-            }
-          }
-        } catch (err) {
-          console.error('[IDR] Error during sensor toggle:', err);
-          alert('Error toggling phone sensors: ' + (err && err.message ? err.message : err));
-        }
+    // ── Sensor Guide Trigger from Home ──
+    const btnSensorGuide = document.getElementById('btn-home-sensor-guide');
+    if (btnSensorGuide) {
+      btnSensorGuide.onclick = () => {
+        if (this.sensorGuideModal) this.sensorGuideModal.classList.add('active');
       };
     }
 
-    // Simulated Blackout / Tunnel Toggle
-    const btnBlackout = document.getElementById('btn-toggle-blackout');
+    // ── Navigation Cockpit Actions ──
+    const btnRecenter = document.getElementById('btn-map-recenter');
+    if (btnRecenter) {
+      btnRecenter.onclick = () => this.map.centerOnVehicle();
+    }
+
+    const btnBlackout = document.getElementById('btn-sim-blackout');
     if (btnBlackout) {
       btnBlackout.onclick = () => {
         this.isBlackoutSimulated = !this.isBlackoutSimulated;
-        btnBlackout.classList.toggle('btn-warning', this.isBlackoutSimulated);
-        btnBlackout.classList.toggle('btn-secondary', !this.isBlackoutSimulated);
-        btnBlackout.textContent = this.isBlackoutSimulated ? '☀️ Exit Blackout (Reacquire)' : '🌑 Simulate Tunnel Blackout';
+        btnBlackout.classList.toggle('active', this.isBlackoutSimulated);
+        const span = btnBlackout.querySelector('span');
+        if (span) {
+          span.textContent = this.isBlackoutSimulated ? 'Restore GNSS' : 'Simulate Outage';
+        }
         this.client.toggleSimulatedBlackout(this.isBlackoutSimulated);
       };
     }
 
-    // Test Crash Trigger
-    const btnCrash = document.getElementById('btn-test-crash');
-    if (btnCrash) {
-      btnCrash.onclick = async () => {
-        const res = await this.client.triggerTestCrash();
-        if (res && res.alert) {
-          this.diag.showCrashAlert(res.alert);
-        }
+    const btnFinishTrip = document.getElementById('btn-finish-trip');
+    if (btnFinishTrip) {
+      btnFinishTrip.onclick = async () => {
+        const summary = await this.client.getSessionSummary();
+        this.diag.showSummaryModal(summary);
       };
     }
 
-    // Replay Controls
+    const btnCancelCrash = document.getElementById('btn-cancel-crash');
+    if (btnCancelCrash) {
+      btnCancelCrash.onclick = async () => {
+        await this.client.cancelCrashAlert();
+        if (this.diag.crashToastEl) this.diag.crashToastEl.classList.add('hidden');
+      };
+    }
+
+    const btnDiagTestCrash = document.getElementById('btn-diag-test-crash');
+    if (btnDiagTestCrash) {
+      btnDiagTestCrash.onclick = async () => {
+        await this.client.triggerTestCrash();
+      };
+    }
+
+    // ── Modal Closes ──
+    const btnCloseDiag = document.getElementById('btn-close-diagnostics');
+    if (btnCloseDiag) {
+      btnCloseDiag.onclick = () => this.diag.hideDiagnosticsModal();
+    }
+
+    const btnCloseSummary = document.getElementById('btn-close-summary');
+    if (btnCloseSummary) {
+      btnCloseSummary.onclick = () => this.diag.hideSummaryModal();
+    }
+
+    const btnSummaryReset = document.getElementById('btn-summary-reset');
+    if (btnSummaryReset) {
+      btnSummaryReset.onclick = async () => {
+        this.diag.hideSummaryModal();
+        await this.client.resetNavigation();
+        this.map.resetPaths(28.6139, 77.2090);
+        this.switchScreen('home');
+        this.setProvenance('standby');
+      };
+    }
+
+    const btnCloseGuide = document.getElementById('btn-close-sensor-guide');
+    const btnGuideRetry = document.getElementById('btn-guide-retry');
+    if (btnCloseGuide) {
+      btnCloseGuide.onclick = () => {
+        if (this.sensorGuideModal) this.sensorGuideModal.classList.remove('active');
+      };
+    }
+    if (btnGuideRetry) {
+      btnGuideRetry.onclick = async () => {
+        if (this.sensorGuideModal) this.sensorGuideModal.classList.remove('active');
+        await this._handleStartLiveNavigation();
+      };
+    }
+
+    // ── Replay Transport Controls ──
     const btnPlay = document.getElementById('btn-replay-play');
     const btnPause = document.getElementById('btn-replay-pause');
     const btnStep = document.getElementById('btn-replay-step');
-    const selectDrive = document.getElementById('select-drive');
     const scrubber = document.getElementById('replay-scrubber');
 
     if (btnPlay) {
       btnPlay.onclick = async () => {
-        // Disengage phone sensors if active to prevent stream collisions
         if (this.isPhoneSensorsActive) {
           this.sensors.stop();
           this.isPhoneSensorsActive = false;
-          if (btnSensors) {
-            btnSensors.textContent = '📱 Start Live Phone IMU+GNSS';
-            btnSensors.className = 'btn btn-block';
-          }
         }
         await this.client.controlReplay('play');
-        const driveName = selectDrive ? selectDrive.value : 'Vf';
-        if (sourceBadge) {
-          sourceBadge.textContent = `SOURCE: 📼 REPLAY (${driveName})`;
-          sourceBadge.style.color = '#0ea5e9';
-          sourceBadge.style.borderColor = '#0ea5e9';
-          sourceBadge.style.background = 'rgba(14, 165, 233, 0.15)';
-        }
       };
     }
 
     if (btnPause) {
       btnPause.onclick = async () => {
         await this.client.controlReplay('pause');
-        if (!this.isPhoneSensorsActive && sourceBadge) {
-          sourceBadge.textContent = 'SOURCE: ⏸️ STANDBY';
-          sourceBadge.style.color = 'var(--text-secondary)';
-          sourceBadge.style.borderColor = 'var(--bg-card-border)';
-          sourceBadge.style.background = 'rgba(148, 163, 184, 0.15)';
-        }
       };
     }
+
     if (btnStep) {
       btnStep.onclick = async () => {
         const res = await this.client.controlReplay('step');
         if (res && res.state) {
           this._onNavigationState(res.state, null);
         }
-      };
-    }
-
-    if (selectDrive) {
-      selectDrive.onchange = (e) => {
-        this.client.controlReplay('load', { drive_name: e.target.value });
       };
     }
 
@@ -203,91 +411,94 @@ class IDRApp {
       };
     }
 
-    // Speed buttons (1x, 2x, 5x)
-    document.querySelectorAll('.btn-speed').forEach((btn) => {
+    document.querySelectorAll('.chip-speed').forEach((btn) => {
       btn.onclick = (e) => {
-        document.querySelectorAll('.btn-speed').forEach((b) => b.classList.remove('active'));
-        e.target.classList.add('active');
-        const spd = parseFloat(e.target.getAttribute('data-speed') || '1.0');
+        document.querySelectorAll('.chip-speed').forEach((b) => b.classList.remove('active'));
+        const target = e.currentTarget || e.target;
+        target.classList.add('active');
+        const spd = parseFloat(target.dataset.speed || '1.0');
         this.client.controlReplay('set_speed', { speed: spd });
-      };
-    });
-
-    // Map overlay buttons
-    const btnCenter = document.getElementById('btn-map-center');
-    if (btnCenter) btnCenter.onclick = () => this.map.centerOnVehicle();
-
-    const btnRefreshBS = document.getElementById('btn-refresh-blackspots');
-    if (btnRefreshBS) btnRefreshBS.onclick = () => this._refreshBlackspots();
-
-    // Field Experiment Recorder Controls
-    const btnRec = document.getElementById('btn-toggle-recording');
-    const recBadge = document.getElementById('rec-status-badge');
-    const timerBadge = document.getElementById('rec-timer-badge');
-
-    if (btnRec) {
-      btnRec.onclick = async () => {
-        if (!this.isRecording) {
-          const res = await this.client.startRecording('Field Experiment Session', this.vehicleType);
-          if (res && res.status === 'RECORDING_STARTED') {
-            this.isRecording = true;
-            this.recStartTime = Date.now();
-            btnRec.textContent = '⏹ Stop Recording';
-            btnRec.style.background = 'var(--rose-accent)';
-            btnRec.style.color = '#fff';
-            if (recBadge) {
-              recBadge.textContent = '● RECORDING';
-              recBadge.style.color = '#f43f5e';
-            }
-            this.recTimer = setInterval(() => {
-              if (timerBadge && this.recStartTime) {
-                const elapsed = Math.floor((Date.now() - this.recStartTime) / 1000);
-                const m = String(Math.floor(elapsed / 60)).padStart(2, '0');
-                const s = String(elapsed % 60).padStart(2, '0');
-                timerBadge.textContent = `${m}:${s}`;
-              }
-            }, 1000);
-          }
-        } else {
-          const res = await this.client.stopRecording();
-          this.isRecording = false;
-          if (this.recTimer) {
-            clearInterval(this.recTimer);
-            this.recTimer = null;
-          }
-          btnRec.textContent = '🔴 Start Recording';
-          btnRec.style.background = 'var(--bg-card)';
-          btnRec.style.color = 'var(--rose-accent)';
-          if (recBadge) {
-            recBadge.textContent = 'SAVED';
-            recBadge.style.color = '#10b981';
-          }
-          if (timerBadge) timerBadge.textContent = '00:00';
-          console.log('[IDR] Session saved:', res);
-        }
-      };
-    }
-
-    // Event Marker Buttons
-    document.querySelectorAll('.btn-marker').forEach((btn) => {
-      btn.onclick = async () => {
-        const label = btn.dataset.label || 'MARKER';
-        await this.client.addMarker(label);
-        const origText = btn.textContent;
-        btn.textContent = '✓ LOGGED';
-        btn.style.borderColor = '#10b981';
-        setTimeout(() => {
-          btn.textContent = origText;
-          btn.style.borderColor = '';
-        }, 1200);
       };
     });
   }
 
+  async _handleStartLiveNavigation() {
+    try {
+      await this.client.controlReplay('pause');
+      await this.client.resetNavigation();
+      this.map.resetPaths();
+
+      // Attempt sensor initialization
+      const started = await this.sensors.start();
+      const isSec = this.sensors.telemetry.isSecureContext;
+
+      if (started) {
+        this.isPhoneSensorsActive = true;
+        this.switchScreen('nav');
+        this.setProvenance('live');
+      } else {
+        // Sensors could not start (permission denied or insecure context)
+        this._showSensorReadinessModal(isSec);
+      }
+    } catch (err) {
+      console.error('[IDR] Error starting live navigation:', err);
+      this._showSensorReadinessModal(false);
+    }
+  }
+
+  _showSensorReadinessModal(isSecure) {
+    if (!this.readinessModal) return;
+
+    if (this.readinessImuEl) {
+      this.readinessImuEl.textContent = this.sensors.telemetry.accel.hasData ? '● Active' : '○ No Data Received';
+      this.readinessImuEl.style.color = this.sensors.telemetry.accel.hasData ? 'var(--status-emerald)' : 'var(--text-muted)';
+    }
+
+    if (this.readinessGpsEl) {
+      this.readinessGpsEl.textContent = this.sensors.telemetry.gnss.hasData ? '● Fix Acquired' : '○ Searching / Blocked';
+      this.readinessGpsEl.style.color = this.sensors.telemetry.gnss.hasData ? 'var(--status-emerald)' : 'var(--text-muted)';
+    }
+
+    if (this.readinessSecEl) {
+      this.readinessSecEl.textContent = isSecure ? '● Secure (HTTPS)' : '⚠ Insecure (HTTP on LAN)';
+      this.readinessSecEl.style.color = isSecure ? 'var(--status-emerald)' : 'var(--status-amber)';
+    }
+
+    this.readinessModal.classList.add('active');
+  }
+
+  async _startJudgeReplayDemo(driveName = 'Vf') {
+    try {
+      if (this.isPhoneSensorsActive) {
+        this.sensors.stop();
+        this.isPhoneSensorsActive = false;
+      }
+      this.map.resetPaths();
+      await this.client.controlReplay('load', { drive_name: driveName });
+      await this.client.controlReplay('play');
+      const driveLabelEl = document.getElementById('replay-drive-label');
+      if (driveLabelEl) {
+        driveLabelEl.textContent = `Replay: ${driveName}`;
+      }
+    } catch (err) {
+      console.error('[IDR] Error starting replay demo:', err);
+    }
+  }
+
   _onSensorFrame(frame) {
-    if (this.client) {
+    if (this.client && this.isPhoneSensorsActive) {
       this.client.sendSensorFrame(frame.imu, frame.gnss);
     }
+  }
+
+  _onSensorTelemetry(telem) {
+    if (this.diag) {
+      this.diag.updateHardwareTelemetry(telem);
+    }
+    if (this.currentMode === 'live') {
+      this.setProvenance('live');
+    }
+    this._updateHomeStatusSemantics();
   }
 
   _onNavigationState(state, replayStatus) {
@@ -299,105 +510,54 @@ class IDRApp {
       state.longitude,
       state.heading_deg,
       state.lean_angle_deg,
-      state.is_in_blackout
+      state.is_in_blackout,
+      state.is_stationary,
+      state.forward_speed_mps
     );
 
-    // 2. Update Diagnostics & USPs
+    // 2. Update HUD Gauges & Toasts
     this.diag.update(state);
 
-    // 3. Update Replay Scrubber if playing
+    // 3. Update Replay Scrubber & Time
     if (replayStatus) {
       const scrubber = document.getElementById('replay-scrubber');
-      if (scrubber) {
-        scrubber.value = replayStatus.progress_percent || 0;
-      }
-      const statusText = document.getElementById('replay-status-text');
-      if (statusText) {
-        statusText.textContent = `${replayStatus.drive_name} (${replayStatus.progress_percent}%)`;
+      if (scrubber) scrubber.value = replayStatus.progress_percent || 0;
+
+      const timeLabel = document.getElementById('replay-time-label');
+      if (timeLabel) {
+        const cur = replayStatus.current_index || 0;
+        const tot = replayStatus.total_frames || 1;
+        const curSec = Math.floor(cur * 0.1);
+        const totSec = Math.floor(tot * 0.1);
+        const m1 = String(Math.floor(curSec / 60)).padStart(2, '0');
+        const s1 = String(curSec % 60).padStart(2, '0');
+        const m2 = String(Math.floor(totSec / 60)).padStart(2, '0');
+        const s2 = String(totSec % 60).padStart(2, '0');
+        timeLabel.textContent = `${m1}:${s1} / ${m2}:${s2}`;
       }
     }
   }
 
   _onConnectionChange(connected) {
-    const dot = document.getElementById('connection-status-dot');
-    const text = document.getElementById('connection-status-text');
-    if (dot) {
-      dot.style.background = connected ? '#10b981' : '#f43f5e';
-      dot.style.boxShadow = connected ? '0 0 8px #10b981' : '0 0 8px #f43f5e';
+    this.isEngineConnected = connected;
+    const pill = this.provenancePill;
+    if (pill && !this.isPhoneSensorsActive && this.currentMode === 'standby') {
+      const text = document.getElementById('provenance-text');
+      if (text) text.textContent = connected ? 'Ready' : 'Connecting';
     }
-    if (text) {
-      text.textContent = connected ? 'ENGINE LIVE' : 'CONNECTING...';
-    }
+    this._updateHomeStatusSemantics();
   }
 
-  _onSensorTelemetry(telem) {
-    if (!telem) return;
-
-    // Secure Context Badge
-    const secBadge = document.getElementById('hw-secure-badge');
-    if (secBadge) {
-      if (telem.isSecureContext) {
-        secBadge.textContent = 'SECURE CTX';
-        secBadge.style.color = '#10b981';
-      } else {
-        secBadge.textContent = 'INSECURE HTTP';
-        secBadge.style.color = '#f59e0b';
+  async _refreshSystemHealth() {
+    try {
+      const health = await this.client.getSystemHealth();
+      if (health) {
+        this.isEngineConnected = health.engine_status === 'HEALTHY';
+        this._updateHomeStatusSemantics();
       }
-    }
-
-    // Accel
-    const accelEl = document.getElementById('hw-accel-status');
-    if (accelEl) {
-      if (telem.accel.hasData) {
-        accelEl.textContent = `● ${telem.accel.rateHz} Hz`;
-        accelEl.style.color = '#10b981';
-      } else {
-        accelEl.textContent = '○ NO DATA';
-        accelEl.style.color = 'var(--text-muted)';
-      }
-    }
-
-    // Gyro
-    const gyroEl = document.getElementById('hw-gyro-status');
-    if (gyroEl) {
-      if (telem.gyro.hasData) {
-        gyroEl.textContent = `● ${telem.gyro.rateHz} Hz`;
-        gyroEl.style.color = '#10b981';
-      } else {
-        gyroEl.textContent = '○ NO DATA';
-        gyroEl.style.color = 'var(--text-muted)';
-      }
-    }
-
-    // Orientation / Compass
-    const oriEl = document.getElementById('hw-ori-status');
-    if (oriEl) {
-      if (telem.orientation.hasData) {
-        oriEl.textContent = `● ${telem.orientation.rateHz} Hz`;
-        oriEl.style.color = '#10b981';
-      } else {
-        oriEl.textContent = '○ NO DATA';
-        oriEl.style.color = 'var(--text-muted)';
-      }
-    }
-
-    // GNSS
-    const gnssEl = document.getElementById('hw-gnss-status');
-    if (gnssEl) {
-      if (telem.gnss.status === 'FIX') {
-        const accStr = telem.gnss.accuracy_m ? ` (±${Math.round(telem.gnss.accuracy_m)}m)` : '';
-        gnssEl.textContent = `● FIX${accStr}`;
-        gnssEl.style.color = '#10b981';
-      } else if (telem.gnss.status === 'SEARCHING') {
-        gnssEl.textContent = '⏳ SEARCHING';
-        gnssEl.style.color = '#f59e0b';
-      } else if (telem.gnss.status === 'DENIED') {
-        gnssEl.textContent = '✖ DENIED';
-        gnssEl.style.color = '#f43f5e';
-      } else {
-        gnssEl.textContent = '○ NO FIX';
-        gnssEl.style.color = 'var(--text-muted)';
-      }
+    } catch (e) {
+      this.isEngineConnected = false;
+      this._updateHomeStatusSemantics();
     }
   }
 
@@ -406,8 +566,6 @@ class IDRApp {
       const res = await this.client.getBlackspots();
       if (res && res.geojson) {
         this.map.updateBlackspotsGeoJSON(res.geojson);
-        const countEl = document.getElementById('val-blackspot-count');
-        if (countEl) countEl.textContent = (res.history || []).length;
       }
     } catch (e) {}
   }

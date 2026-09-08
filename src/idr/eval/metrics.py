@@ -13,6 +13,8 @@ class NavigationMetrics:
     cep_50_m: float
     drms_95_m: float
     mean_speed_m_s: float
+    mae_position_m: float = 0.0
+    max_error_m: float = 0.0
 
 def compute_navigation_metrics(
     pred_enu: np.ndarray,
@@ -32,12 +34,14 @@ def compute_navigation_metrics(
     step_dists = np.linalg.norm(gt_steps, axis=1)
     total_dist = float(np.sum(step_dists))
 
-    final_drift = float(horizontal_errors[-1])
+    final_drift = float(horizontal_errors[-1]) if len(horizontal_errors) > 0 else 0.0
     drift_pct = (final_drift / total_dist * 100.0) if total_dist > 0 else 0.0
 
-    rmse = float(np.sqrt(np.mean(horizontal_errors**2)))
-    cep_50 = float(np.percentile(horizontal_errors, 50))
-    drms_95 = float(np.percentile(horizontal_errors, 95))
+    rmse = float(np.sqrt(np.mean(horizontal_errors**2))) if len(horizontal_errors) > 0 else 0.0
+    mae = float(np.mean(horizontal_errors)) if len(horizontal_errors) > 0 else 0.0
+    max_err = float(np.max(horizontal_errors)) if len(horizontal_errors) > 0 else 0.0
+    cep_50 = float(np.percentile(horizontal_errors, 50)) if len(horizontal_errors) > 0 else 0.0
+    drms_95 = float(np.percentile(horizontal_errors, 95)) if len(horizontal_errors) > 0 else 0.0
 
     return NavigationMetrics(
         total_distance_m=total_dist,
@@ -47,4 +51,6 @@ def compute_navigation_metrics(
         cep_50_m=cep_50,
         drms_95_m=drms_95,
         mean_speed_m_s=total_dist / (len(pred_enu) * 0.1) if len(pred_enu) > 0 else 0.0,
+        mae_position_m=mae,
+        max_error_m=max_err,
     )

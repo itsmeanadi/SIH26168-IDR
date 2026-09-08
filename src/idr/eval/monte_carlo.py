@@ -162,7 +162,7 @@ def run_monte_carlo_evaluation(
     # Setup OSM road graph matcher
     sample_enu = scenarios[0].gt_enu[::10]
     graph_loader = OSMGraphLoader()
-    osm_graph = graph_loader.build_from_waypoints(sample_enu)
+    osm_graph = graph_loader.build_from_waypoints(sample_enu, unsafe_allow_ground_truth_graph=True)
     matcher = HMMMapMatcher(osm_graph, sigma_z=30.0)
 
     # Setup KalmanNet

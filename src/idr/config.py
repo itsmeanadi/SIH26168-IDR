@@ -37,14 +37,36 @@ def set_seed(seed: int = SEED):
         pass
     os.environ["PYTHONHASHSEED"] = str(seed)
 
+# Authentic IO-VNBD Driver to Group Mapping
+# Total 4 distinct drivers across 72 synchronized drive pairs:
+# Driver A: S (6 drives: S1, S2, S3a, S3b, S3c, S4 - 308,839 samples)
+# Driver B: M (1 drive: M - 105,974 samples)
+# Driver D: Y (1 drive: Y1 - 70,285 samples)
+# Driver E: Vf (2 drives), Vta (30 drives), Vtb (12 drives), Vw (20 drives) - 585,647 samples
+DRIVER_GROUP_MAP = {
+    "Driver A": ("S",),
+    "Driver B": ("M",),
+    "Driver D": ("Y", "Y1"),
+    "Driver E": ("Vf", "Vta", "Vtb", "Vw"),
+}
+
 @dataclass
 class DatasetConfig:
-    """IO-VNBD Dataset Split Configuration."""
-    train_drives: tuple = ("M", "S", "Vta", "Vtb", "Vw")
-    val_drives: tuple = ("Y1",)
-    test_drives: tuple = ("Vf",)
+    """IO-VNBD Dataset Split Configuration.
+    
+    Default: Scientifically rigorous DRIVER-DISJOINT split:
+    - Train: Drivers E & A (70 drives, 894,486 samples, 83.5% of data)
+    - Val:   Driver B (1 drive 'M', 105,974 samples, 9.9% of data)
+    - Test:  Driver D (1 drive 'Y1', 70,285 samples, 6.6% of data)
+    
+    Guarantees: Drivers(Train) ∩ Drivers(Val) ∩ Drivers(Test) = ∅
+    """
+    train_drives: tuple = ("S", "Vf", "Vta", "Vtb", "Vw")
+    val_drives: tuple = ("M",)
+    test_drives: tuple = ("Y", "Y1")
     window_size: int = 50  # 5 seconds at 10 Hz
     window_stride: int = 10  # 1 second stride (80% overlap)
+    split_policy: str = "driver_disjoint"  # 'driver_disjoint' or 'drive_disjoint'
 
 @dataclass
 class ModelConfig:

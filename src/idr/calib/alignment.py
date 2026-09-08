@@ -56,7 +56,7 @@ class PhoneToVehicleAligner:
         self,
         min_stationary_samples: int = 15,
         max_stationary_variance: float = 0.25,
-        min_motion_samples: int = 20,
+        min_motion_samples: int = 5,
         min_motion_energy: float = 0.05,
         min_eigenvalue_ratio: float = 2.0,
     ):
@@ -108,8 +108,14 @@ class PhoneToVehicleAligner:
         if len(acc) != 3 or not np.all(np.isfinite(acc)):
             return self.state
 
-        # ── STAGE 1: Gravity / Vertical Axis Estimation (while stationary) ──
+        # ── STAGE 1: Gravity / Vertical Axis Estimation ──
         if self.state in (AlignmentState.NOT_CALIBRATED, AlignmentState.CALIBRATING_GRAVITY):
+            norm_a = float(np.linalg.norm(acc))
+            if self.z_phone is None and 7.0 <= norm_a <= 12.5:
+                # Instant interim leveling on first valid gravity sample
+                self.z_phone = acc / norm_a
+                self._build_interim_rotation()
+
             if is_stationary:
                 self.state = AlignmentState.CALIBRATING_GRAVITY
                 self.stationary_samples.append(acc)
@@ -124,13 +130,11 @@ class PhoneToVehicleAligner:
                             self.z_phone = mean_g / norm_g
                             self.state = AlignmentState.CALIBRATING_FORWARD
                             self._build_interim_rotation()
-            else:
-                # If motion happens before gravity calibration completes, keep accumulating
-                if len(self.stationary_samples) > 0:
-                    self.stationary_samples.pop(0)
+            elif self.z_phone is not None:
+                self.state = AlignmentState.CALIBRATING_FORWARD
 
         # ── STAGE 2 & 3: Forward Axis Estimation & Sign Resolution (during motion) ──
-        elif self.state == AlignmentState.CALIBRATING_FORWARD:
+        if self.state == AlignmentState.CALIBRATING_FORWARD:
             if not is_stationary and self.z_phone is not None:
                 # Remove gravity component
                 dyn_acc = acc - np.dot(acc, self.z_phone) * self.z_phone
@@ -260,13 +264,14 @@ class PhoneToVehicleAligner:
         if self.z_phone is None:
             return
         z_phone = self.z_phone
+        # Default smartphone portrait orientation: Phone +Y (screen top) points along Vehicle Forward (X_v)
         ref_vec = np.array([0.0, 1.0, 0.0]) if abs(z_phone[1]) < 0.9 else np.array([1.0, 0.0, 0.0])
         x_cand = ref_vec - np.dot(ref_vec, z_phone) * z_phone
         norm_x = float(np.linalg.norm(x_cand))
         if norm_x > 1e-4:
             x_cand /= norm_x
         else:
-            x_cand = np.array([1.0, 0.0, 0.0])
+            x_cand = np.array([0.0, 1.0, 0.0])
         y_cand = np.cross(z_phone, x_cand)
         norm_y = float(np.linalg.norm(y_cand))
         if norm_y > 1e-4:

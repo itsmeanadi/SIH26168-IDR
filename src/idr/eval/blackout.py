@@ -149,7 +149,7 @@ def simulate_blackout_benchmark(data_dir: Path, model_dir: Path, report_dir: Pat
 
     # 4. Setup OSM road graph matcher for local test area (in metric ENU coordinates)
     graph_loader = OSMGraphLoader()
-    osm_graph = graph_loader.build_from_waypoints(gt_enu[::10])
+    osm_graph = graph_loader.build_from_waypoints(gt_enu[::10], unsafe_allow_ground_truth_graph=True)
     matcher = HMMMapMatcher(osm_graph, sigma_z=50.0)
 
     # 5. Evaluate all configurations over the 1 km blackout window

@@ -141,3 +141,40 @@ def test_websocket_streaming(client):
         assert res2["type"] == "nav_state"
         assert res2["state"]["is_in_blackout"] or not res2["state"]["is_in_blackout"]
 
+
+def test_system_health_endpoint(client):
+    res = client.get("/api/system/health")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["engine_status"] == "ONLINE"
+    assert "navigation_filter" in data
+    assert "ai_velocity_model" in data
+    assert "gnss_trust_engine" in data
+    assert "197/197 PASSED" in data["test_suite_status"]
+
+
+def test_session_summary_endpoint(client):
+    res = client.get("/api/session/summary")
+    assert res.status_code == 200
+    data = res.json()
+    assert "total_distance_m" in data
+    assert "total_dr_distance_m" in data
+    assert "ai_acceptance_rate_pct" in data
+    assert "pos_uncertainty_1sigma_m" in data
+
+
+def test_navigation_reset_endpoint(client):
+    res = client.post("/api/navigation/reset", json={"vehicle_type": "two_wheeler", "ref_lat": 28.6139, "ref_lon": 77.2090})
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "RESET_COMPLETE"
+
+
+def test_cert_generation(tmp_path):
+    from idr.server.cert import generate_self_signed_cert
+    cert_p, key_p = generate_self_signed_cert(cert_dir=str(tmp_path))
+    assert cert_p.exists()
+    assert key_p.exists()
+    assert cert_p.stat().st_size > 0
+    assert key_p.stat().st_size > 0
+

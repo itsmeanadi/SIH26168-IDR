@@ -1,0 +1,54 @@
+{
+  "phase": "PHASE_25",
+  "report_id": "REP-SIH26168-PHASE25-NAV-ENGINE-INTEGRATION-20260908",
+  "project": "SIH 2026 Problem Statement 26168 - AI-ML Intelligent Dead Reckoning (IDR)",
+  "title": "Phase 25 — 15-State ES-EKF Navigation Engine Integration",
+  "status": "APPROVED",
+  "timestamp": "2026-09-08T10:15:35+05:30",
+  "integration_details": {
+    "engine_class": "src/idr/engine/navigation_engine.py:NavigationEngine",
+    "fusion_class": "src/idr/filters/fusion.py:GNSSINSFusion",
+    "filter_class": "src/idr/filters/es_ekf.py:ErrorStateKalmanFilter",
+    "filter_selection": ["es_ekf", "legacy_ekf"],
+    "default_filter": "es_ekf",
+    "standstill_cog_threshold_mps": 1.5,
+    "ai_update_mechanism": "Forward-speed observation (h_ai(x) = e1^T R^T v = v_bx) with NIS chi2 gating"
+  },
+  "authentic_replay_results": {
+    "validation_drive_y1": {
+      "path": "data/raw/categorised_authentic/Y (Driver D)/Y1",
+      "samples": 600,
+      "legacy_runtime_sec": 0.7599,
+      "es_ekf_runtime_sec": 1.2140,
+      "es_ekf_per_sample_ms": 2.023,
+      "es_ekf_throughput_hz": 494.3,
+      "all_finite": true,
+      "ai_accepted_count": 56,
+      "ai_rejected_count": 0
+    },
+    "held_out_drive_m": {
+      "path": "data/raw/categorised_authentic/M (Driver B)",
+      "samples": 600,
+      "legacy_runtime_sec": 0.7544,
+      "es_ekf_runtime_sec": 1.0503,
+      "es_ekf_per_sample_ms": 1.750,
+      "es_ekf_throughput_hz": 571.3,
+      "all_finite": true,
+      "ai_accepted_count": 56,
+      "ai_rejected_count": 0
+    }
+  },
+  "test_suite_status": {
+    "original_count": 147,
+    "new_count": 157,
+    "passed": 157,
+    "failed": 0,
+    "execution_time_sec": 11.02
+  },
+  "scientific_invariants_enforced": {
+    "causality_preserved": true,
+    "gt_leakage_prevented": true,
+    "circular_ai_ekf_prevented": true,
+    "replay_deterministic": true
+  }
+}

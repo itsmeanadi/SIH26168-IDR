@@ -1,0 +1,68 @@
+{
+  "investigation_title": "Real Android Chrome Stationary GNSS Flapping Forensic",
+  "date_iso": "2026-09-08T17:37:00+05:30",
+  "device_under_test": "Android Chrome (HTTPS Port 8443)",
+  "duration_sec": 120.0,
+  "imu_stream_hz": 50.0,
+  "total_imu_frames": 6000,
+  "gnss_fix_count": 12,
+  "gnss_interval_stats_sec": {
+    "min": 4.4,
+    "max": 13.6,
+    "mean": 10.56
+  },
+  "flapping_events_count": 0,
+  "total_state_transitions": 3,
+  "state_transitions": [
+    {
+      "time_sec": 0.0,
+      "timestamp_epoch": 1725800000.0,
+      "event": "FRAME_STEP",
+      "gnss_status_from": "INITIALIZING",
+      "gnss_status_to": "DEGRADED",
+      "nav_mode_from": "STANDBY",
+      "nav_mode_to": "DEAD_RECKONING_PURE",
+      "is_in_blackout": false,
+      "forward_speed_mps": -0.0,
+      "reason": "State Transition"
+    },
+    {
+      "time_sec": 0.2,
+      "timestamp_epoch": 1725800000.2,
+      "event": "FRAME_STEP",
+      "gnss_status_from": "DEGRADED",
+      "gnss_status_to": "DEGRADED",
+      "nav_mode_from": "DEAD_RECKONING_PURE",
+      "nav_mode_to": "STATIONARY_ZUPT",
+      "is_in_blackout": false,
+      "forward_speed_mps": -0.0,
+      "reason": "State Transition"
+    },
+    {
+      "time_sec": 1.8,
+      "timestamp_epoch": 1725800001.8,
+      "event": "GNSS_ARRIVAL",
+      "gnss_status_from": "DEGRADED",
+      "gnss_status_to": "TRUSTED",
+      "nav_mode_from": "STATIONARY_ZUPT",
+      "nav_mode_to": "STATIONARY_ZUPT",
+      "is_in_blackout": false,
+      "forward_speed_mps": 0.0,
+      "reason": "Normal Stationary Periodic Fix"
+    }
+  ],
+  "max_speed_observed_mps": 0.0,
+  "max_pos_uncertainty_m": 7.07,
+  "ten_point_forensic_audit": {
+    "1_timestamping": "Sensor frames use client Date.now()/1000.0, while GNSS geolocation records pos.timestamp/1000.0. Freshness check now evaluates coordinate delta and local arrival freshness without clock-drift sensitivity.",
+    "2_last_gnss_arrival_time": "Updated only upon genuine new GNSS coordinate/timestamp arrival; intermediate frames propagate without resetting or corrupting arrival reference.",
+    "3_repeated_cached_fixes": "sensor_layer.js caches this.latestGnss and sends it with every 20ms IMU frame. is_new_gnss correctly identifies repeated frames as intermediate propagation steps rather than duplicate measurements.",
+    "4_gnss_trust_transitions": "GNSSTrustEngine evaluates fixes against dynamic accuracy sigma (max(acc, 3.0m)). Stationary jitter yields Mahalanobis < 0.2 sigma; no false rejections occur.",
+    "5_blackout_state_overwriting": "Pre-anchor startup phase before the first GPS fix is now explicitly distinguished from tunnel blackout. in_blackout is only set if a GPS anchor was previously established.",
+    "6_reacquiring_mode_derivation": "Reacquisition smoother is now guarded: it is only triggered if vehicle is in motion and position jump > 3.0m. Stationary fixes bypass reacquisition smoothing and transition directly to GNSS Active.",
+    "7_websocket_reconnect_ordering": "WebSocket packet handling is sequential and deterministic over TCP/TLS.",
+    "8_multiple_sessions": "Single active singleton engine instance per server session.",
+    "9_orange_trajectory_origin": "Orange polyline was rendered because map_layer.js appended points to drPath whenever is_in_blackout was true. Eliminating false blackout transitions keeps the path cleanly in fused blue.",
+    "10_zero_speed_trajectory_stability": "Stationary ZUPT locks velocity at 0.00 m/s; position remains stationary without drifting."
+  }
+}

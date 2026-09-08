@@ -39,7 +39,7 @@ class GNSSTrustEngine:
         max_speed_threshold_mps: float = 55.0,  # ~200 km/h
         max_jump_dist_m: float = 25.0,           # Max single-step jump allowed
         max_innovation_sigma: float = 3.5,       # Chi-square gate threshold (~99.7%)
-        max_accuracy_threshold_m: float = 30.0,  # Ignore fixes worse than 30m
+        max_accuracy_threshold_m: float = 50.0,  # Accommodates consumer mobile GPS jitter and indoor reception
         trust_ema_alpha: float = 0.25,
     ):
         self.max_speed_threshold_mps = max_speed_threshold_mps

@@ -1,0 +1,18 @@
+dataset_name: authentic-iovnbd
+source: "University of Warwick IO-VNBD Benchmark (IEEE T-ITS 2021)"
+source_url: "https://ieee-dataport.org/open-access/io-vnbd-inertial-odometry-vehicle-navigation-benchmark-dataset"
+authenticity: authentic
+vehicle_type: passenger_car
+sensor_type: smartphone_mems_imu_and_vehicle_obd2_wheel_speed
+sampling_rate_hz: 10.0
+ground_truth_type: obd2_can_transmission_wheel_speed
+archive_sha256: "624003b0bfb3d221114eb262dd02f21f7dba74fb25d8045b4b8ac684956d2855"
+license_status: open_access_research_only
+preprocessing_version: "2.0.0_authentic_driver_disjoint"
+raw_data_path: data/raw/categorised_authentic
+processed_data_path: data/processed/authentic
+split_policy: driver_disjoint
+train_drivers: ["Driver E", "Driver A"]
+val_drivers: ["Driver B"]
+test_drivers: ["Driver D"]
+notes: "Verified authentic IO-VNBD dataset with driver-disjoint development split."

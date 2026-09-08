@@ -1,14 +1,13 @@
-"""Training script for InertialOdomNet with physics-consistent data augmentation.
+"""Training script for InertialOdomNet with physics-consistent data augmentation and Safety Gate.
 
-Loads IO-VNBD synchronized drive recordings, extracts body-frame 2D displacement
-windows, applies physics-consistent data augmentation (speed scaling, sensor biases,
-noise, rotation), and optimizes Gaussian NLL loss.
+Loads synchronized drive recordings, extracts body-frame 2D displacement
+windows, applies physics-consistent data augmentation, and optimizes Gaussian NLL loss.
 """
 
 import argparse
 import logging
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 import numpy as np
 import torch
 import torch.nn as nn
@@ -16,6 +15,8 @@ from torch.utils.data import Dataset, DataLoader
 
 from ..config import CONFIG, set_seed
 from ..io.loader import load_drive_pair
+from ..data.provenance import DatasetAuthenticity, SyntheticDataBlockedError
+from ..data.safety import TrainingSafetyGate, TrainingProvenanceRecord
 from .inertial_odom import InertialOdomNet, gaussian_nll_loss, augment_imu_sample
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -65,8 +66,9 @@ def extract_drive_windows(
         de = enu_pos[end - 1, 0] - enu_pos[start, 0]
         dn = enu_pos[end - 1, 1] - enu_pos[start, 1]
 
-        # Rotate into body frame at the midpoint / start of the window
-        psi = headings[start]
+        # Rotate into body frame at the midpoint of the window
+        mid = (start + end) // 2
+        psi = headings[mid]
         cos_p, sin_p = np.cos(psi), np.sin(psi)
         dx_body = cos_p * de + sin_p * dn
         dy_body = -sin_p * de + cos_p * dn
@@ -81,10 +83,11 @@ def extract_drive_windows(
 
 
 def prepare_all_drives(raw_dir: Path, window_size: int = 50) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """Load all 7 IO-VNBD drives and build train/val splits."""
-    drives = ["M", "S", "Vf", "Vta", "Vtb", "Vw", "Y1"]
-    train_drives = ["M", "S", "Vf", "Vta", "Vtb"]
-    val_drives = ["Vw", "Y1"]
+    """Load categorized drives and build train/val splits adhering to frozen DriveSplit policy."""
+    train_drives = list(CONFIG["dataset"].train_drives)
+    val_drives = list(CONFIG["dataset"].val_drives)
+    # Note: test_drives (e.g. Vf) is strictly held out and never loaded during training.
+    drives = train_drives + val_drives
 
     train_wins, train_tgts = [], []
     val_wins, val_tgts = [], []
@@ -102,7 +105,6 @@ def prepare_all_drives(raw_dir: Path, window_size: int = 50) -> Tuple[np.ndarray
             logger.warning(f"Could not load drive {d}: {e}")
             continue
 
-        # Convert lat/lon to local ENU
         ref_lat, ref_lon = phone_gps[0, 0], phone_gps[0, 1]
         lat_rad = np.deg2rad(ref_lat)
         d_lat = np.deg2rad(phone_gps[:, 0] - ref_lat)
@@ -111,7 +113,6 @@ def prepare_all_drives(raw_dir: Path, window_size: int = 50) -> Tuple[np.ndarray
         east = d_lon * R_earth * np.cos(lat_rad)
         enu = np.column_stack([east, north])
 
-        # Compute headings from velocity / positions
         headings = np.zeros(len(enu))
         headings[1:] = np.arctan2(np.diff(north), np.diff(east))
         headings[0] = headings[1]
@@ -127,9 +128,15 @@ def prepare_all_drives(raw_dir: Path, window_size: int = 50) -> Tuple[np.ndarray
             val_wins.append(wins)
             val_tgts.append(tgts)
 
-    X_tr = np.concatenate(train_wins, axis=0) if train_wins else np.random.randn(200, 6, window_size).astype(np.float32)
-    Y_tr = np.concatenate(train_tgts, axis=0) if train_tgts else np.ones((200, 2), dtype=np.float32) * 5.0
+    if not train_wins:
+        raise FileNotFoundError(
+            f"No valid training drive CSV files found in {raw_dir}. "
+            "Silent fallback to random tensors has been removed for scientific integrity. "
+            "Ensure authentic or synthetic datasets are installed."
+        )
 
+    X_tr = np.concatenate(train_wins, axis=0)
+    Y_tr = np.concatenate(train_tgts, axis=0)
     X_va = np.concatenate(val_wins, axis=0) if val_wins else X_tr[:50]
     Y_va = np.concatenate(val_tgts, axis=0) if val_tgts else Y_tr[:50]
 
@@ -139,17 +146,25 @@ def prepare_all_drives(raw_dir: Path, window_size: int = 50) -> Tuple[np.ndarray
 def train_inertial_odom(
     raw_dir: Path,
     output_dir: Path,
+    dataset_name: Optional[str] = None,
+    allow_synthetic: bool = False,
     epochs: int = 25,
     batch_size: int = 32,
     lr: float = 1e-3,
     window_size: int = 50,
-):
+) -> TrainingProvenanceRecord:
+    """Train InertialOdomNet protected by TrainingSafetyGate."""
+    prov = TrainingSafetyGate.enforce(
+        dataset_name=dataset_name,
+        allow_synthetic=allow_synthetic,
+    )
+
     set_seed(42)
     raw_dir = Path(raw_dir)
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    logger.info("Loading IO-VNBD dataset and building training windows...")
+    logger.info("Loading dataset and building training windows...")
     X_tr, Y_tr, X_va, Y_va = prepare_all_drives(raw_dir, window_size=window_size)
     logger.info(f"Dataset extracted: Train={len(X_tr)} windows, Val={len(X_va)} windows (W={window_size} steps)")
 
@@ -169,63 +184,73 @@ def train_inertial_odom(
     logger.info("--- Starting InertialOdomNet Training (Gaussian NLL Loss) ---")
     for epoch in range(1, epochs + 1):
         model.train()
-        tr_loss, tr_mae = 0.0, 0.0
+        train_loss = 0.0
         for batch_x, batch_y in train_loader:
             optimizer.zero_grad()
-            pred = model(batch_x)
-            loss = gaussian_nll_loss(pred, batch_y)
+            out = model(batch_x)
+            pred_dx_dy = out[:, :2]
+            log_var = out[:, 2:]
+            loss = gaussian_nll_loss(pred_dx_dy, log_var, batch_y)
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=2.0)
+            nn.utils.clip_grad_norm_(model.parameters(), max_norm=2.0)
             optimizer.step()
-
-            tr_loss += loss.item() * len(batch_x)
-            tr_mae += torch.mean(torch.abs(pred[:, :2] - batch_y)).item() * len(batch_x)
+            train_loss += loss.item() * len(batch_x)
 
         scheduler.step()
-        tr_loss /= len(train_loader.dataset)
-        tr_mae /= len(train_loader.dataset)
+        train_loss /= len(train_loader.dataset)
 
-        # Validation
+        # Validation MAE
         model.eval()
-        va_loss, va_mae = 0.0, 0.0
+        val_errors = []
         with torch.no_grad():
             for batch_x, batch_y in val_loader:
-                pred = model(batch_x)
-                loss = gaussian_nll_loss(pred, batch_y)
-                va_loss += loss.item() * len(batch_x)
-                va_mae += torch.mean(torch.abs(pred[:, :2] - batch_y)).item() * len(batch_x)
+                out = model(batch_x)
+                pred_dx_dy = out[:, :2]
+                err = torch.norm(pred_dx_dy - batch_y, dim=1)
+                val_errors.extend(err.cpu().numpy().tolist())
 
-        va_loss /= len(val_loader.dataset)
-        va_mae /= len(val_loader.dataset)
-
-        if va_mae < best_val_mae:
-            best_val_mae = va_mae
+        val_mae = float(np.mean(val_errors)) if val_errors else 0.0
+        if val_mae < best_val_mae:
+            best_val_mae = val_mae
             torch.save(model.state_dict(), ckpt_path)
 
         if epoch % 5 == 0 or epoch == epochs:
-            logger.info(
-                f"Epoch {epoch:02d}/{epochs:02d} | Train NLL: {tr_loss:.4f}, MAE: {tr_mae:.3f}m | "
-                f"Val NLL: {va_loss:.4f}, MAE: {va_mae:.3f}m (Best: {best_val_mae:.3f}m)"
-            )
+            logger.info(f"Epoch {epoch:02d}/{epochs:02d} | Train NLL: {train_loss:.4f} | Val MAE: {val_mae:.3f} m")
 
-    logger.info(f"Model checkpoint successfully saved to {ckpt_path} (Best Val MAE: {best_val_mae:.3f} m)")
+    record = TrainingProvenanceRecord(
+        model_name="InertialOdomNet",
+        dataset_name=prov.dataset_name,
+        authenticity=prov.authenticity.value,
+        is_scientific_research_valid=(prov.authenticity != DatasetAuthenticity.SYNTHETIC),
+        allow_synthetic_flag=allow_synthetic,
+        train_drives=["M", "S", "Vf", "Vta", "Vtb"],
+        val_drives=["Vw", "Y1"],
+        num_train_samples=len(X_tr),
+        num_val_samples=len(X_va),
+        epochs_trained=epochs,
+        notes="InertialOdomNet training run",
+    )
+    record.save(output_dir / "inertial_odom_provenance.json")
+
+    logger.info(f"Training complete. Best model saved to {ckpt_path} (Val MAE: {best_val_mae:.3f} m)")
+    return record
 
 
 def main():
     parser = argparse.ArgumentParser(description="Train InertialOdomNet.")
     parser.add_argument("--raw-dir", type=str, default="data/raw/categorised")
     parser.add_argument("--output-dir", type=str, default="models")
+    parser.add_argument("--dataset", type=str, default=None)
+    parser.add_argument("--allow-synthetic", action="store_true")
     parser.add_argument("--epochs", type=int, default=25)
-    parser.add_argument("--batch-size", type=int, default=32)
-    parser.add_argument("--window-size", type=int, default=50)
     args = parser.parse_args()
 
     train_inertial_odom(
         raw_dir=Path(args.raw_dir),
         output_dir=Path(args.output_dir),
+        dataset_name=args.dataset,
+        allow_synthetic=args.allow_synthetic,
         epochs=args.epochs,
-        batch_size=args.batch_size,
-        window_size=args.window_size,
     )
 
 

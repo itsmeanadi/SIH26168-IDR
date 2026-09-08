@@ -48,9 +48,10 @@ Thumbs.db
 .ipynb_checkpoints/
 notebooks/.ipynb_checkpoints/
 
-# Environment
+# Environment & SSL Certs
 .env
 *.log
+certs/
 
 # Reports and Results: track all markdown, figures, and plots
 !reports/figures/*.png

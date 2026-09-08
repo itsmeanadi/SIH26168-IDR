@@ -1,0 +1,732 @@
+{
+  "timestamp": "2026-09-08 12:23:47",
+  "total_simulations": 180,
+  "configurations": {
+    "phase30a_baseline": {
+      "overall": {
+        "mean_drift_pct": 1022.6772875129758,
+        "median_drift_pct": 144.30777511042925,
+        "p90_drift_pct": 1137.4482015336023,
+        "p95_drift_pct": 6493.855804297408,
+        "worst_drift_pct": 13749.745368121117,
+        "sih_pass_rate_pct": 0.0,
+        "mean_pre_bo_pos_error_m": 71.18394738800862,
+        "mean_pre_bo_yaw_error_deg": 59.94866832897562,
+        "mean_heading_error_10s_deg": 71.72886743737077,
+        "mean_heading_error_30s_deg": 79.20541539793827,
+        "mean_heading_error_60s_deg": 80.10449159507903,
+        "mean_final_heading_error_deg": 80.10449159507903,
+        "mean_final_pos_error_m": 991.5311894211769,
+        "mean_final_yaw_std_deg": 9.5245152086572,
+        "ai_acceptance_rate_pct": 94.0,
+        "mag_acceptance_rate_pct": 0.0,
+        "mag_accepted_total": 0,
+        "mag_rejected_total": 0,
+        "mag_disturbance_count_total": 19965,
+        "nhc_active_total": 7633,
+        "nhc_turn_disabled_total": 0
+      },
+      "by_split": {
+        "Drive_M_validation": {
+          "count": 15,
+          "mean_drift_pct": 1899.5958440382303,
+          "median_drift_pct": 190.6202793847135,
+          "p90_drift_pct": 6769.581296519481,
+          "worst_drift_pct": 13749.745368121117,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 1493.842921237401,
+          "mean_final_heading_error_deg": 73.38565866522814
+        },
+        "Drive_Y1_test": {
+          "count": 15,
+          "mean_drift_pct": 145.7587309877212,
+          "median_drift_pct": 129.0959083100026,
+          "p90_drift_pct": 185.75428039700677,
+          "worst_drift_pct": 480.6083592097762,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 489.21945760495254,
+          "mean_final_heading_error_deg": 86.8233245249299
+        }
+      },
+      "by_regime": {
+        "straight": {
+          "count": 6,
+          "mean_drift_pct": 74.56708796286203,
+          "median_drift_pct": 75.57680972531138,
+          "p90_drift_pct": 120.98992369136216,
+          "worst_drift_pct": 129.0959083100026,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 262.09265669058885,
+          "mean_final_heading_error_deg": 55.188731866405554
+        },
+        "accel_decel": {
+          "count": 6,
+          "mean_drift_pct": 249.0083507805211,
+          "median_drift_pct": 136.0124603059408,
+          "p90_drift_pct": 565.7792343970598,
+          "worst_drift_pct": 879.2896250534682,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 700.5172600065986,
+          "mean_final_heading_error_deg": 109.10879383162744
+        },
+        "low_speed": {
+          "count": 6,
+          "mean_drift_pct": 4482.8030581697785,
+          "median_drift_pct": 1970.7418745322748,
+          "p90_drift_pct": 11362.565301208537,
+          "worst_drift_pct": 13749.745368121117,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 2687.9880414424974,
+          "mean_final_heading_error_deg": 69.69943909028623
+        },
+        "turning": {
+          "count": 6,
+          "mean_drift_pct": 200.97951216219278,
+          "median_drift_pct": 161.0185634962707,
+          "p90_drift_pct": 315.60665684545404,
+          "worst_drift_pct": 374.60284885498226,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 662.026481593237,
+          "mean_final_heading_error_deg": 99.07199505637072
+        }
+      },
+      "by_duration": {
+        "10s": {
+          "count": 10,
+          "mean_drift_pct": 1488.2705867704417,
+          "median_drift_pct": 118.4890947586183,
+          "p90_drift_pct": 1605.9239551644403,
+          "worst_drift_pct": 13749.745368121117,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 226.6635085657691,
+          "mean_final_heading_error_deg": 72.71120316505272
+        },
+        "30s": {
+          "count": 10,
+          "mean_drift_pct": 1030.589246989107,
+          "median_drift_pct": 163.67829209540696,
+          "p90_drift_pct": 1234.6810873990767,
+          "worst_drift_pct": 8975.385234295956,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 1201.2354484435095,
+          "mean_final_heading_error_deg": 88.0560636117564
+        },
+        "60s": {
+          "count": 10,
+          "mean_drift_pct": 549.1720287793783,
+          "median_drift_pct": 134.05889315860625,
+          "p90_drift_pct": 1137.4482015335977,
+          "worst_drift_pct": 3460.8753898547734,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 1546.6946112542519,
+          "mean_final_heading_error_deg": 79.54620800842795
+        }
+      }
+    },
+    "mag_only": {
+      "overall": {
+        "mean_drift_pct": 1022.8314827950159,
+        "median_drift_pct": 144.30777511042925,
+        "p90_drift_pct": 1137.4482015336023,
+        "p95_drift_pct": 6493.855804297408,
+        "worst_drift_pct": 13749.745368121117,
+        "sih_pass_rate_pct": 0.0,
+        "mean_pre_bo_pos_error_m": 71.18394738800862,
+        "mean_pre_bo_yaw_error_deg": 59.94866832897562,
+        "mean_heading_error_10s_deg": 71.72886743737077,
+        "mean_heading_error_30s_deg": 80.38731220312872,
+        "mean_heading_error_60s_deg": 81.28638840026947,
+        "mean_final_heading_error_deg": 81.28638840026947,
+        "mean_final_pos_error_m": 992.256198339299,
+        "mean_final_yaw_std_deg": 9.35572649811338,
+        "ai_acceptance_rate_pct": 94.0,
+        "mag_acceptance_rate_pct": 0.751219512195122,
+        "mag_accepted_total": 154,
+        "mag_rejected_total": 20346,
+        "mag_disturbance_count_total": 19966,
+        "nhc_active_total": 7633,
+        "nhc_turn_disabled_total": 0
+      },
+      "by_split": {
+        "Drive_M_validation": {
+          "count": 15,
+          "mean_drift_pct": 1899.9042346023102,
+          "median_drift_pct": 195.2461378459153,
+          "p90_drift_pct": 6769.581296519481,
+          "worst_drift_pct": 13749.745368121117,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 1495.2929390736454,
+          "mean_final_heading_error_deg": 75.74945227560902
+        },
+        "Drive_Y1_test": {
+          "count": 15,
+          "mean_drift_pct": 145.7587309877212,
+          "median_drift_pct": 129.0959083100026,
+          "p90_drift_pct": 185.75428039700677,
+          "worst_drift_pct": 480.6083592097762,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 489.21945760495254,
+          "mean_final_heading_error_deg": 86.8233245249299
+        }
+      },
+      "by_regime": {
+        "straight": {
+          "count": 6,
+          "mean_drift_pct": 74.56708796286203,
+          "median_drift_pct": 75.57680972531138,
+          "p90_drift_pct": 120.98992369136216,
+          "worst_drift_pct": 129.0959083100026,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 262.09265669058885,
+          "mean_final_heading_error_deg": 55.188731866405554
+        },
+        "accel_decel": {
+          "count": 6,
+          "mean_drift_pct": 249.77932719072143,
+          "median_drift_pct": 138.3253895365417,
+          "p90_drift_pct": 565.7792343970598,
+          "worst_drift_pct": 879.2896250534682,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 704.1423045972089,
+          "mean_final_heading_error_deg": 115.01827785757966
+        },
+        "low_speed": {
+          "count": 6,
+          "mean_drift_pct": 4482.8030581697785,
+          "median_drift_pct": 1970.7418745322748,
+          "p90_drift_pct": 11362.565301208537,
+          "worst_drift_pct": 13749.745368121117,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 2687.9880414424974,
+          "mean_final_heading_error_deg": 69.69943909028623
+        },
+        "turning": {
+          "count": 6,
+          "mean_drift_pct": 200.97951216219278,
+          "median_drift_pct": 161.0185634962707,
+          "p90_drift_pct": 315.60665684545404,
+          "worst_drift_pct": 374.60284885498226,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 662.026481593237,
+          "mean_final_heading_error_deg": 99.07199505637072
+        }
+      },
+      "by_duration": {
+        "10s": {
+          "count": 10,
+          "mean_drift_pct": 1488.2705867704417,
+          "median_drift_pct": 118.4890947586183,
+          "p90_drift_pct": 1605.9239551644403,
+          "worst_drift_pct": 13749.745368121117,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 226.6635085657691,
+          "mean_final_heading_error_deg": 72.71120316505272
+        },
+        "30s": {
+          "count": 10,
+          "mean_drift_pct": 1031.0518328352275,
+          "median_drift_pct": 163.67829209540696,
+          "p90_drift_pct": 1234.6810873990767,
+          "worst_drift_pct": 8975.385234295956,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 1203.410475197876,
+          "mean_final_heading_error_deg": 91.60175402732776
+        },
+        "60s": {
+          "count": 10,
+          "mean_drift_pct": 549.1720287793783,
+          "median_drift_pct": 134.05889315860625,
+          "p90_drift_pct": 1137.4482015335977,
+          "worst_drift_pct": 3460.8753898547734,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 1546.6946112542519,
+          "mean_final_heading_error_deg": 79.54620800842795
+        }
+      }
+    },
+    "heading_stabilization_only": {
+      "overall": {
+        "mean_drift_pct": 1235.528660666761,
+        "median_drift_pct": 160.03440406178987,
+        "p90_drift_pct": 3717.4592583116755,
+        "p95_drift_pct": 7058.55508344182,
+        "worst_drift_pct": 14213.760022442217,
+        "sih_pass_rate_pct": 0.0,
+        "mean_pre_bo_pos_error_m": 76.78893916268355,
+        "mean_pre_bo_yaw_error_deg": 44.224550777617466,
+        "mean_heading_error_10s_deg": 64.12812373070565,
+        "mean_heading_error_30s_deg": 67.2319540143243,
+        "mean_heading_error_60s_deg": 79.35340986255031,
+        "mean_final_heading_error_deg": 79.35340986255031,
+        "mean_final_pos_error_m": 999.4969124283674,
+        "mean_final_yaw_std_deg": 9.277024910267063,
+        "ai_acceptance_rate_pct": 95.19,
+        "mag_acceptance_rate_pct": 0.0,
+        "mag_accepted_total": 0,
+        "mag_rejected_total": 0,
+        "mag_disturbance_count_total": 19959,
+        "nhc_active_total": 6686,
+        "nhc_turn_disabled_total": 0
+      },
+      "by_split": {
+        "Drive_M_validation": {
+          "count": 15,
+          "mean_drift_pct": 1824.0296577006402,
+          "median_drift_pct": 179.02565473179516,
+          "p90_drift_pct": 6126.023337706782,
+          "worst_drift_pct": 14213.760022442217,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 1331.6906270307368,
+          "mean_final_heading_error_deg": 62.225637116085025
+        },
+        "Drive_Y1_test": {
+          "count": 15,
+          "mean_drift_pct": 647.0276636328817,
+          "median_drift_pct": 155.92855665858826,
+          "p90_drift_pct": 1299.0385438460353,
+          "worst_drift_pct": 6026.714074423758,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 667.3031978259983,
+          "mean_final_heading_error_deg": 96.48118260901559
+        }
+      },
+      "by_regime": {
+        "straight": {
+          "count": 6,
+          "mean_drift_pct": 74.2113594300291,
+          "median_drift_pct": 47.268671311421954,
+          "p90_drift_pct": 148.50440696203725,
+          "worst_drift_pct": 156.51886223214706,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 288.59943676786264,
+          "mean_final_heading_error_deg": 75.3724672583802
+        },
+        "accel_decel": {
+          "count": 6,
+          "mean_drift_pct": 1469.4637158335452,
+          "median_drift_pct": 372.6648581057867,
+          "p90_drift_pct": 3935.6863706803165,
+          "worst_drift_pct": 6026.714074423758,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 1027.4728510748785,
+          "mean_final_heading_error_deg": 102.20283415696433
+        },
+        "low_speed": {
+          "count": 6,
+          "mean_drift_pct": 4381.5479197934155,
+          "median_drift_pct": 1970.7418745322748,
+          "p90_drift_pct": 11058.274329358504,
+          "worst_drift_pct": 14213.760022442217,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 2542.207947612637,
+          "mean_final_heading_error_deg": 61.741195898209746
+        },
+        "turning": {
+          "count": 6,
+          "mean_drift_pct": 147.0563102812445,
+          "median_drift_pct": 132.2155681880107,
+          "p90_drift_pct": 238.3336687510323,
+          "worst_drift_pct": 260.3139826632408,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 500.6315619117488,
+          "mean_final_heading_error_deg": 73.23044707804064
+        }
+      },
+      "by_duration": {
+        "10s": {
+          "count": 10,
+          "mean_drift_pct": 1691.1765389173645,
+          "median_drift_pct": 130.69492984309124,
+          "p90_drift_pct": 3081.5688024874053,
+          "worst_drift_pct": 14213.760022442217,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 276.05010919922455,
+          "mean_final_heading_error_deg": 65.56225858740666
+        },
+        "30s": {
+          "count": 10,
+          "mean_drift_pct": 1500.8339843861318,
+          "median_drift_pct": 167.4771056951917,
+          "p90_drift_pct": 6214.3215306088605,
+          "worst_drift_pct": 7902.78863627479,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 1303.8489365468693,
+          "mean_final_heading_error_deg": 66.7978298160258
+        },
+        "60s": {
+          "count": 10,
+          "mean_drift_pct": 514.5754586967867,
+          "median_drift_pct": 160.03440406178987,
+          "p90_drift_pct": 794.7480379392341,
+          "worst_drift_pct": 3460.8753898547734,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 1418.5916915390085,
+          "mean_final_heading_error_deg": 105.70014118421845
+        }
+      }
+    },
+    "mag_plus_heading_stabilization": {
+      "overall": {
+        "mean_drift_pct": 1236.4765174368226,
+        "median_drift_pct": 160.4062100980726,
+        "p90_drift_pct": 3717.4592583116755,
+        "p95_drift_pct": 7058.55508344182,
+        "worst_drift_pct": 14213.760022442217,
+        "sih_pass_rate_pct": 0.0,
+        "mean_pre_bo_pos_error_m": 76.78893916268355,
+        "mean_pre_bo_yaw_error_deg": 44.224550777617466,
+        "mean_heading_error_10s_deg": 64.12812373070565,
+        "mean_heading_error_30s_deg": 69.99035162220996,
+        "mean_heading_error_60s_deg": 83.82711001704244,
+        "mean_final_heading_error_deg": 83.82711001704244,
+        "mean_final_pos_error_m": 1006.892238413287,
+        "mean_final_yaw_std_deg": 8.72698858534767,
+        "ai_acceptance_rate_pct": 95.19,
+        "mag_acceptance_rate_pct": 2.2585365853658534,
+        "mag_accepted_total": 463,
+        "mag_rejected_total": 20037,
+        "mag_disturbance_count_total": 19960,
+        "nhc_active_total": 6686,
+        "nhc_turn_disabled_total": 0
+      },
+      "by_split": {
+        "Drive_M_validation": {
+          "count": 15,
+          "mean_drift_pct": 1824.8866606998029,
+          "median_drift_pct": 191.8806997192348,
+          "p90_drift_pct": 6126.023337706782,
+          "worst_drift_pct": 14213.760022442217,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 1335.7201589919603,
+          "mean_final_heading_error_deg": 66.80363976693907
+        },
+        "Drive_Y1_test": {
+          "count": 15,
+          "mean_drift_pct": 648.0663741738426,
+          "median_drift_pct": 155.92855665858826,
+          "p90_drift_pct": 1299.0385438460353,
+          "worst_drift_pct": 6026.714074423758,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 678.0643178346141,
+          "mean_final_heading_error_deg": 100.85058026714584
+        }
+      },
+      "by_regime": {
+        "straight": {
+          "count": 6,
+          "mean_drift_pct": 74.2113594300291,
+          "median_drift_pct": 47.268671311421954,
+          "p90_drift_pct": 148.50440696203725,
+          "worst_drift_pct": 156.51886223214706,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 288.59943676786264,
+          "mean_final_heading_error_deg": 75.3724672583802
+        },
+        "accel_decel": {
+          "count": 6,
+          "mean_drift_pct": 1471.6062233314517,
+          "median_drift_pct": 372.6648581057867,
+          "p90_drift_pct": 3935.6863706803165,
+          "worst_drift_pct": 6026.714074423758,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 1037.5466809779368,
+          "mean_final_heading_error_deg": 113.64784078409946
+        },
+        "low_speed": {
+          "count": 6,
+          "mean_drift_pct": 4381.5479197934155,
+          "median_drift_pct": 1970.7418745322748,
+          "p90_drift_pct": 11058.274329358504,
+          "worst_drift_pct": 14213.760022442217,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 2542.207947612637,
+          "mean_final_heading_error_deg": 61.741195898209746
+        },
+        "turning": {
+          "count": 6,
+          "mean_drift_pct": 149.52915128821925,
+          "median_drift_pct": 136.49400327532317,
+          "p90_drift_pct": 238.3336687510323,
+          "worst_drift_pct": 260.3139826632408,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 526.2755619612716,
+          "mean_final_heading_error_deg": 84.82741218257298
+        }
+      },
+      "by_duration": {
+        "10s": {
+          "count": 10,
+          "mean_drift_pct": 1691.1765389173645,
+          "median_drift_pct": 130.69492984309124,
+          "p90_drift_pct": 3081.5688024874053,
+          "worst_drift_pct": 14213.760022442217,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 276.05010919922455,
+          "mean_final_heading_error_deg": 65.56225858740666
+        },
+        "30s": {
+          "count": 10,
+          "mean_drift_pct": 1502.1345580002755,
+          "median_drift_pct": 170.49606200227055,
+          "p90_drift_pct": 6214.3215306088605,
+          "worst_drift_pct": 7902.78863627479,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 1309.9742888543847,
+          "mean_final_heading_error_deg": 74.30116170435004
+        },
+        "60s": {
+          "count": 10,
+          "mean_drift_pct": 516.1184553928284,
+          "median_drift_pct": 160.4062100980726,
+          "p90_drift_pct": 794.7480379392341,
+          "worst_drift_pct": 3460.8753898547734,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 1434.6523171862523,
+          "mean_final_heading_error_deg": 111.61790975937063
+        }
+      }
+    },
+    "turn_aware_nhc_only": {
+      "overall": {
+        "mean_drift_pct": 997.4941552854882,
+        "median_drift_pct": 144.1201142728699,
+        "p90_drift_pct": 1846.8538014192013,
+        "p95_drift_pct": 5442.614840996095,
+        "worst_drift_pct": 13749.745368121117,
+        "sih_pass_rate_pct": 0.0,
+        "mean_pre_bo_pos_error_m": 71.18394738800862,
+        "mean_pre_bo_yaw_error_deg": 59.94866832897562,
+        "mean_heading_error_10s_deg": 74.11545394327801,
+        "mean_heading_error_30s_deg": 72.96465227702784,
+        "mean_heading_error_60s_deg": 89.5007793898805,
+        "mean_final_heading_error_deg": 89.5007793898805,
+        "mean_final_pos_error_m": 952.7633921353073,
+        "mean_final_yaw_std_deg": 9.492272798712541,
+        "ai_acceptance_rate_pct": 93.08,
+        "mag_acceptance_rate_pct": 0.0,
+        "mag_accepted_total": 0,
+        "mag_rejected_total": 0,
+        "mag_disturbance_count_total": 19962,
+        "nhc_active_total": 7797,
+        "nhc_turn_disabled_total": 3499
+      },
+      "by_split": {
+        "Drive_M_validation": {
+          "count": 15,
+          "mean_drift_pct": 1759.90917518632,
+          "median_drift_pct": 101.91585025730687,
+          "p90_drift_pct": 5710.3952987129705,
+          "worst_drift_pct": 13749.745368121117,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 1323.8024830806505,
+          "mean_final_heading_error_deg": 69.32040971065389
+        },
+        "Drive_Y1_test": {
+          "count": 15,
+          "mean_drift_pct": 235.07913538465633,
+          "median_drift_pct": 148.46643438357452,
+          "p90_drift_pct": 185.75428039700677,
+          "worst_drift_pct": 1774.6120231201526,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 581.7243011899639,
+          "mean_final_heading_error_deg": 109.68114906910708
+        }
+      },
+      "by_regime": {
+        "straight": {
+          "count": 6,
+          "mean_drift_pct": 86.5366487624661,
+          "median_drift_pct": 83.75883066134915,
+          "p90_drift_pct": 147.7189925067368,
+          "worst_drift_pct": 155.66419085130835,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 310.2251565036723,
+          "mean_final_heading_error_deg": 85.17618315656021
+        },
+        "accel_decel": {
+          "count": 6,
+          "mean_drift_pct": 255.30462538131042,
+          "median_drift_pct": 90.74573007134202,
+          "p90_drift_pct": 622.0723150079295,
+          "worst_drift_pct": 1048.5504825580322,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 786.9961599983748,
+          "mean_final_heading_error_deg": 104.11913410111738
+        },
+        "low_speed": {
+          "count": 6,
+          "mean_drift_pct": 4351.398793839639,
+          "median_drift_pct": 2135.8209146153913,
+          "p90_drift_pct": 10801.192164284494,
+          "worst_drift_pct": 13749.745368121117,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 2437.934502343744,
+          "mean_final_heading_error_deg": 76.3110286204888
+        },
+        "turning": {
+          "count": 6,
+          "mean_drift_pct": 188.61956783623023,
+          "median_drift_pct": 158.87557212333522,
+          "p90_drift_pct": 319.22187264465157,
+          "worst_drift_pct": 341.08682184247414,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 587.3367810523741,
+          "mean_final_heading_error_deg": 90.34507996925028
+        }
+      },
+      "by_duration": {
+        "10s": {
+          "count": 10,
+          "mean_drift_pct": 1477.4444330330557,
+          "median_drift_pct": 94.80152997986195,
+          "p90_drift_pct": 1642.595767914253,
+          "worst_drift_pct": 13749.745368121117,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 219.15909722443234,
+          "mean_final_heading_error_deg": 74.46383868098454
+        },
+        "30s": {
+          "count": 10,
+          "mean_drift_pct": 918.3748308961519,
+          "median_drift_pct": 164.18022348801645,
+          "p90_drift_pct": 1092.242035703011,
+          "worst_drift_pct": 7852.638960447868,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 1107.241900043344,
+          "mean_final_heading_error_deg": 82.38191886381648
+        },
+        "60s": {
+          "count": 10,
+          "mean_drift_pct": 596.6632019272568,
+          "median_drift_pct": 128.52529910965637,
+          "p90_drift_pct": 1846.8538014192,
+          "worst_drift_pct": 2497.0298061106296,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 1531.889179138145,
+          "mean_final_heading_error_deg": 111.65658062484044
+        }
+      }
+    },
+    "phase31a_all_mechanisms": {
+      "overall": {
+        "mean_drift_pct": 1360.0689053265965,
+        "median_drift_pct": 162.2915836941645,
+        "p90_drift_pct": 2849.998232941947,
+        "p95_drift_pct": 7036.221145559126,
+        "worst_drift_pct": 16116.217305389426,
+        "sih_pass_rate_pct": 0.0,
+        "mean_pre_bo_pos_error_m": 76.78893916268355,
+        "mean_pre_bo_yaw_error_deg": 44.224550777617466,
+        "mean_heading_error_10s_deg": 71.92066463580105,
+        "mean_heading_error_30s_deg": 77.62942102395326,
+        "mean_heading_error_60s_deg": 82.25384875543449,
+        "mean_final_heading_error_deg": 82.25384875543449,
+        "mean_final_pos_error_m": 1080.0442018341341,
+        "mean_final_yaw_std_deg": 8.891803265943246,
+        "ai_acceptance_rate_pct": 94.11,
+        "mag_acceptance_rate_pct": 2.3853658536585365,
+        "mag_accepted_total": 489,
+        "mag_rejected_total": 20011,
+        "mag_disturbance_count_total": 19954,
+        "nhc_active_total": 6779,
+        "nhc_turn_disabled_total": 3549
+      },
+      "by_split": {
+        "Drive_M_validation": {
+          "count": 15,
+          "mean_drift_pct": 1965.4188495119786,
+          "median_drift_pct": 253.47364415091297,
+          "p90_drift_pct": 5716.120808337095,
+          "worst_drift_pct": 16116.217305389426,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 1371.89510382343,
+          "mean_final_heading_error_deg": 59.02470742132851
+        },
+        "Drive_Y1_test": {
+          "count": 15,
+          "mean_drift_pct": 754.7189611412138,
+          "median_drift_pct": 157.84010172796593,
+          "p90_drift_pct": 1983.1593716603963,
+          "worst_drift_pct": 6026.714074423758,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 788.1932998448382,
+          "mean_final_heading_error_deg": 105.48299008954045
+        }
+      },
+      "by_regime": {
+        "straight": {
+          "count": 6,
+          "mean_drift_pct": 70.48642484797618,
+          "median_drift_pct": 29.73314232345014,
+          "p90_drift_pct": 155.49953974777844,
+          "worst_drift_pct": 157.84010172796593,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 275.1972706755818,
+          "mean_final_heading_error_deg": 85.59519798259339
+        },
+        "accel_decel": {
+          "count": 6,
+          "mean_drift_pct": 1473.7637304265743,
+          "median_drift_pct": 370.48025734766424,
+          "p90_drift_pct": 3935.6863706803165,
+          "worst_drift_pct": 6026.714074423758,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 1036.3683219568854,
+          "mean_final_heading_error_deg": 102.54463649172779
+        },
+        "low_speed": {
+          "count": 6,
+          "mean_drift_pct": 4797.75396326305,
+          "median_drift_pct": 2286.26149046002,
+          "p90_drift_pct": 11989.19939093875,
+          "worst_drift_pct": 16116.217305389426,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 2522.183939634489,
+          "mean_final_heading_error_deg": 66.63172873158652
+        },
+        "turning": {
+          "count": 6,
+          "mean_drift_pct": 351.75371326883436,
+          "median_drift_pct": 261.95519562056455,
+          "p90_drift_pct": 730.9776307169104,
+          "worst_drift_pct": 741.031276912403,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 914.9279825295879,
+          "mean_final_heading_error_deg": 74.79410049917036
+        }
+      },
+      "by_duration": {
+        "10s": {
+          "count": 10,
+          "mean_drift_pct": 1933.0915159169392,
+          "median_drift_pct": 130.69492984309124,
+          "p90_drift_pct": 3271.8145307821255,
+          "worst_drift_pct": 16116.217305389426,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 327.43974241019293,
+          "mean_final_heading_error_deg": 75.25501565195921
+        },
+        "30s": {
+          "count": 10,
+          "mean_drift_pct": 1545.2604609008094,
+          "median_drift_pct": 172.6695149031847,
+          "p90_drift_pct": 6210.260814630188,
+          "worst_drift_pct": 7862.181476488074,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 1411.0051551064798,
+          "mean_final_heading_error_deg": 79.37241370314125
+        },
+        "60s": {
+          "count": 10,
+          "mean_drift_pct": 601.8547391620402,
+          "median_drift_pct": 161.07390332793915,
+          "p90_drift_pct": 2117.6468379395324,
+          "worst_drift_pct": 2497.0298061106296,
+          "sih_pass_rate_pct": 0.0,
+          "mean_final_pos_error_m": 1501.6877079857295,
+          "mean_final_heading_error_deg": 92.13411691120298
+        }
+      }
+    }
+  }
+}

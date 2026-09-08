@@ -1,0 +1,19 @@
+dataset_name: synthetic-iovnbd-mock
+source: "download_data.py local mock generator"
+authenticity: synthetic
+vehicle_type: simulated_passenger_car
+sensor_type: simulated_imu_trigonometric
+sampling_rate_hz: 10.0
+ground_truth_type: exact_sinusoid_orbit
+license_status: internal_mock
+preprocessing_version: "1.0.0"
+drive_ids:
+  - M
+  - S
+  - Vf
+  - Vta
+  - Vtb
+  - Vw
+  - Y1
+data_path: data/raw/categorised
+notes: "Locally generated synthetic mock data. Intended SOLELY for software continuous integration and regression tests. NOT authentic IO-VNBD research data."

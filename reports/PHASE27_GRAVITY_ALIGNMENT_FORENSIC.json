@@ -1,0 +1,66 @@
+{
+  "phase": "27",
+  "title": "Phase 27 15-State ES-EKF Blackout Failure Forensic Audit & Physical Correction",
+  "timestamp": "2026-09-08T11:20:00Z",
+  "scientific_verdict": "ROOT CAUSE CONFIRMED AND FIXED",
+  "provenance": {
+    "validation_drive": "M (Driver B)",
+    "held_out_test_drive": "Y1 (Driver D)",
+    "total_regression_tests_passing": 170,
+    "leakage_controls_maintained": true,
+    "ai_model_modified": false
+  },
+  "forensic_discoveries": [
+    {
+      "id": "RC-1",
+      "name": "Benchmark Evaluator Sensor Frame Bypass",
+      "description": "The benchmark evaluator passed raw smartphone-frame IMU directly to ES-EKF without executing PhoneToVehicleAligner.",
+      "impact": "Uncalibrated 105 deg to 174 deg smartphone mounting yaw and tilt corrupted IMU propagation."
+    },
+    {
+      "id": "RC-2",
+      "name": "Aligner Cold-Start Standstill Starvation",
+      "description": "PhoneToVehicleAligner required 15 standstill frames with low variance; drives starting in continuous motion never calibrated, defaulting R_p2v to identity.",
+      "impact": "Filter ran on unaligned raw frame for up to 553 seconds."
+    },
+    {
+      "id": "RC-3",
+      "name": "Uncalibrated Smartphone Accelerometer Vertical Scale Bias",
+      "description": "Consumer smartphone accelerometer measured specific force norm 9.51 to 10.16 m/s^2 rather than standard 9.80665 m/s^2.",
+      "impact": "Uncompensated vertical bias generated fictitious vertical acceleration integrating to downward velocity v_z < 0."
+    },
+    {
+      "id": "RC-4",
+      "name": "NHC Attitude-Velocity Destabilization Coupling",
+      "description": "Downward velocity v_z < 0 coupled via NHC Jacobian H[1,7] = v_x into nominal attitude, pitching the vehicle downward by 30 to 70 deg.",
+      "impact": "Tilted 9.8 m/s^2 gravity into the forward axis (g sin theta ~ 7.5 m/s^2), causing catastrophic runaway (>50 m/s velocity error, >3000 m position error)."
+    },
+    {
+      "id": "RC-5",
+      "name": "Unestimated Gyro DC Bias & Lack of Dynamic Leveling",
+      "description": "Smartphone MEMS gyros possess 0.02 to 0.09 rad/s DC bias. Without dynamic gravity leveling or initial bias estimation, open-loop attitude integrated gyro bias linearly.",
+      "impact": "Continuous pitch/roll drift leading to gravity leakage."
+    },
+    {
+      "id": "RC-6",
+      "name": "Chi-Square Gate Lockout Due to Acceleration Runaway",
+      "description": "Because gravity leakage accelerated nominal velocity by 5 to 10 m/s between 1.0s AI inferences, AI speed innovation exceeded NIS gate (>9.0) and was rejected 79.8% to 100% of the time.",
+      "impact": "Filter was starved of valid AI speed corrections."
+    }
+  ],
+  "corrections_implemented": [
+    "Added in-motion dynamic vertical axis estimation to PhoneToVehicleAligner (calibrates within 2.0s without standstill).",
+    "Implemented initialize_leveling(acc_meas, yaw_rad) in ES-EKF to align initial quaternion with gravity and initialize scale bias.",
+    "Implemented update_gravity_leveling(acc_meas, forward_speed, yaw_rate, fwd_acc) to continuously bound pitch and roll drift during cruising.",
+    "Corrected 1 Hz GPS freshness handling in benchmark evaluator to prevent 10 Hz repeated fixes from pulling velocity to zero.",
+    "Updated ESEKFConfig process noise parameters to reflect consumer smartphone IMU uncertainty."
+  ],
+  "validation_metrics": {
+    "representative_case": "M_10s_accel_decel_4900",
+    "phase_26_pos_error_m": 4338.4,
+    "phase_27_pos_error_m": 6.9,
+    "reduction_factor": "628x",
+    "ai_acceptance_rate_phase_26": "0.0%",
+    "ai_acceptance_rate_phase_27": "100.0%"
+  }
+}

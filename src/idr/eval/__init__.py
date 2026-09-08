@@ -2,12 +2,26 @@
 
 from .metrics import compute_navigation_metrics, NavigationMetrics
 from .plotting import generate_evaluation_plots
+from .blackout_gate import GNSSBlackoutGate, StreamSample, BlackoutPeriod
+from .evaluation_harness import (
+    ScientificEvaluator,
+    EvaluationSpec,
+    EvaluationProvenanceAudit,
+    EvaluationRunResult,
+)
 
 __all__ = [
     "compute_navigation_metrics",
     "NavigationMetrics",
     "simulate_blackout_benchmark",
     "generate_evaluation_plots",
+    "GNSSBlackoutGate",
+    "StreamSample",
+    "BlackoutPeriod",
+    "ScientificEvaluator",
+    "EvaluationSpec",
+    "EvaluationProvenanceAudit",
+    "EvaluationRunResult",
 ]
 
 def __getattr__(name):

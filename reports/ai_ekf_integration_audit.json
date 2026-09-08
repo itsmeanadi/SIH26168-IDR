@@ -1,0 +1,102 @@
+{
+  "audit_version": "1.0.0",
+  "timestamp": "2026-09-08T02:17:00Z",
+  "phase": "PHASE 19 — AI + PHYSICS NAVIGATION INTEGRATION",
+  "problem_statement": "SIH 2026 PS 26168",
+  "scientific_verdict": "AI-EKF INTEGRATION IMPLEMENTED — BLACKOUT VALIDATION PENDING",
+  "model_provenance": {
+    "checkpoint_path": "models/authentic/velocity_net.pt",
+    "architecture": "VelocityEstimatorNet (Conv1D + 2-layer BiGRU + Linear Regressor)",
+    "trainable_parameters": 79394,
+    "input_channels": 6,
+    "input_features": ["acc_x", "acc_y", "acc_z", "gyro_x", "gyro_y", "gyro_z"],
+    "window_size_samples": 50,
+    "window_duration_seconds": 5.0,
+    "inference_stride_seconds": 1.0,
+    "training_dataset": "authentic-iovnbd (72 matched drive pairs, 4 drivers)",
+    "training_split": {
+      "train": "Drivers E + A (88,218 windows)",
+      "val": "Driver B / Drive M (10,581 windows)",
+      "test": "Driver D / Drive Y1 (7,012 windows)"
+    },
+    "best_epoch": 6,
+    "val_huber_loss": 1.7378,
+    "test_metrics_held_out": {
+      "mae_mps": 2.566689,
+      "rmse_mps": 3.446276,
+      "r2": 0.576756,
+      "pearson_r": 0.772827,
+      "bias_mps": -0.454878
+    }
+  },
+  "ekf_architecture": {
+    "state_dimension": 9,
+    "state_vector": ["p_E", "p_N", "p_U", "v_E", "v_N", "v_U", "psi", "b_a", "b_omega"],
+    "velocity_indices": [3, 4, 5],
+    "heading_index": 6,
+    "measurement_equation": "h(x) = cos(psi) * v_E + sin(psi) * v_N",
+    "jacobian_H": "[0, 0, 0, cos(psi), sin(psi), 0, -sin(psi)*v_E + cos(psi)*v_N, 0, 0]",
+    "cross_coupling_term": "dh/dpsi = v_lat",
+    "covariance_bounds": {
+      "min_sigma_v": 1.0,
+      "max_sigma_v": 10.0
+    },
+    "dynamic_regime_uncertainty": {
+      "stationary_or_low_speed_under_0_5_mps": 1.5,
+      "urban_medium_speed_0_5_to_15_mps": 3.0,
+      "highway_high_speed_over_15_mps": 4.5
+    },
+    "gating": {
+      "method": "Normalized Innovation Squared (NIS) / Mahalanobis 1D",
+      "threshold_sigma": 3.0,
+      "nis_threshold": 9.0
+    },
+    "update_form": "Joseph-form stabilized covariance update P = (I - KH) P (I - KH)^T + K R K^T"
+  },
+  "two_wheeler_interaction": {
+    "nhc_relationship": "Complementary: NHC constrains lateral and vertical slip (v_lat ~ 0, v_vert ~ 0), while AI velocity constrains along-track forward speed (v_fwd ~ z_ai)",
+    "zupt_zaru_relationship": "Complementary: ZUPT clamps velocity to zero when stationary; ZARU clamps yaw gyro bias",
+    "motorcycle_status": "Software dynamics implemented; physical motorcycle real-world validation pending (IO-VNBD is automotive)"
+  },
+  "test_suite_status": {
+    "total_tests": 104,
+    "passed": 104,
+    "failed": 0
+  },
+  "ablation_summary": {
+    "validation_drive_M": {
+      "10s_blackout": {
+        "baseline_rmse_m": 31.11,
+        "ai_ekf_rmse_m": 21.62,
+        "ai_ekf_nhc_rmse_m": 21.19
+      },
+      "30s_blackout": {
+        "baseline_rmse_m": 103.07,
+        "ai_ekf_rmse_m": 32.05,
+        "ai_ekf_nhc_rmse_m": 29.60
+      },
+      "60s_blackout": {
+        "baseline_rmse_m": 125.89,
+        "ai_ekf_rmse_m": 104.86,
+        "ai_ekf_nhc_rmse_m": 102.51
+      }
+    },
+    "held_out_test_drive_Y1": {
+      "10s_blackout": {
+        "baseline_rmse_m": 7.53,
+        "ai_ekf_rmse_m": 7.14,
+        "ai_acceptance_rate_pct": 100.0
+      },
+      "30s_blackout": {
+        "baseline_rmse_m": 57.04,
+        "ai_ekf_rmse_m": 56.91,
+        "ai_acceptance_rate_pct": 96.7
+      },
+      "60s_blackout": {
+        "baseline_rmse_m": 105.87,
+        "ai_ekf_rmse_m": 105.56,
+        "ai_acceptance_rate_pct": 98.3
+      }
+    }
+  }
+}

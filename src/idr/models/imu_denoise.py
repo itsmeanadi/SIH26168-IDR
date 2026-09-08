@@ -1,14 +1,23 @@
-"""IMU Denoising and Bias Correction Network.
+"""IMU Denoising and Bias Residual Correction Network (Experimental Research Module).
 
-Lightweight 1D-CNN regressing bias/noise residuals from raw smartphone IMU windows.
-Compatible with ONNX Opset 14+ and TFLite.
+Predicts sensor noise and bias offsets [delta_ax, delta_ay, delta_az, delta_gx, delta_gy, delta_gz]
+to subtract from raw smartphone IMU measurements:
+    u_corrected = u_raw - IMUDenoiseNet(window)
+
+SCIENTIFIC STATUS:
+- Experimental Research Module.
+- Requires high-grade reference IMU or stationary bias supervision during training.
+- If untrained or unverified, the network output must default to zero residual (identity passthrough),
+  preserving legitimate vehicle dynamics.
 """
 
+from typing import Optional
 import torch
 import torch.nn as nn
 
+
 class IMUDenoiseNet(nn.Module):
-    """1D Dilated Residual CNN for IMU bias and noise removal.
+    """1D Dilated Residual CNN for IMU bias and noise residual estimation.
     
     Input shape:  (Batch, 6, window_size) -> [ax, ay, az, gx, gy, gz]
     Output shape: (Batch, 6) -> residual bias/noise offset to subtract
@@ -19,7 +28,7 @@ class IMUDenoiseNet(nn.Module):
         self.conv1 = nn.Conv1d(in_channels, hidden_dim, kernel_size=3, padding=1)
         self.relu1 = nn.ReLU()
         
-        # Dilated residual blocks for wide receptive field at low compute
+        # Dilated residual blocks for wide receptive field
         self.res1 = nn.Sequential(
             nn.Conv1d(hidden_dim, hidden_dim, kernel_size=3, padding=2, dilation=2),
             nn.BatchNorm1d(hidden_dim),
@@ -44,7 +53,10 @@ class IMUDenoiseNet(nn.Module):
             nn.Linear(hidden_dim, 32),
             nn.ReLU(),
             nn.Linear(32, out_channels),
+            nn.Tanh(),  # Bounded residual to prevent runaway divergence
         )
+        # Scale output to maximum ±1.0 m/s^2 and ±0.1 rad/s realistic bias range
+        self.register_buffer("scale", torch.tensor([1.0, 1.0, 1.0, 0.1, 0.1, 0.1], dtype=torch.float32))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x: (B, 6, L)
@@ -53,5 +65,6 @@ class IMUDenoiseNet(nn.Module):
         h = self.relu3(h + self.res2(h))
         
         pooled = self.gap(h).squeeze(-1)  # (B, hidden_dim)
-        residual = self.head(pooled)      # (B, 6)
-        return residual
+        raw_residual = self.head(pooled)  # (B, 6) in [-1, 1]
+        scaled_residual = raw_residual * self.scale
+        return scaled_residual

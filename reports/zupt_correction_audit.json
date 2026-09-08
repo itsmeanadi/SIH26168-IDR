@@ -1,0 +1,89 @@
+{
+  "audit_version": "1.0.0",
+  "timestamp": "2026-09-08T02:28:00Z",
+  "phase": "PHASE 21 — ZUPT CORRECTION AND REGRESSION VALIDATION",
+  "problem_statement": "SIH 2026 PS 26168",
+  "scientific_verdict": "ZUPT BUG CORRECTED — BLACKOUT RE-EVALUATION REQUIRED",
+  "root_cause_summary": {
+    "issue": "False stationary detection during constant-velocity cruising",
+    "mechanism": "StationaryDetector previously evaluated only specific force magnitude consistency (| ||a|| - g | <= 1.5) and low acceleration variance (var(||a||) < 0.15). During smooth, unaccelerated straight-line cruising, specific force equals gravity (9.81 m/s^2) and variance is near zero. Consequently, StationaryDetector falsely latched stationary=True on 116 of 300 frames during the 30s blackout, triggering apply_zupt() which crushed EKF velocity to zero on moving frames.",
+    "correction": "Multi-modal moving-vs-stationary gate implemented: (1) requires kinematic consistency with current speed (speed <= 0.8 m/s), (2) multi-frame persistence hysteresis (2 consecutive quiet frames to latch), and (3) immediate unlatching upon motion detection."
+  },
+  "benchmark_comparison_y1": {
+    "10s_blackout": {
+      "distance_traveled_m": 8.0,
+      "old_pipeline": {
+        "final_position_error_m": 1.72,
+        "rmse_position_error_m": 6.17,
+        "drift_percentage": 21.56,
+        "velocity_mae_mps": 0.94,
+        "velocity_rmse_mps": 1.32,
+        "zupt_activations": 5
+      },
+      "corrected_pipeline": {
+        "final_position_error_m": 4.60,
+        "rmse_position_error_m": 7.89,
+        "drift_percentage": 57.49,
+        "velocity_mae_mps": 1.46,
+        "velocity_rmse_mps": 1.91,
+        "zupt_activations": 5
+      }
+    },
+    "30s_blackout": {
+      "distance_traveled_m": 91.5,
+      "old_pipeline": {
+        "final_position_error_m": 84.44,
+        "rmse_position_error_m": 56.59,
+        "drift_percentage": 92.32,
+        "velocity_mae_mps": 2.20,
+        "velocity_rmse_mps": 3.25,
+        "zupt_activations": 116
+      },
+      "corrected_pipeline": {
+        "final_position_error_m": 103.04,
+        "rmse_position_error_m": 67.71,
+        "drift_percentage": 112.66,
+        "velocity_mae_mps": 1.73,
+        "velocity_rmse_mps": 2.01,
+        "zupt_activations": 5
+      }
+    },
+    "60s_blackout": {
+      "distance_traveled_m": 295.8,
+      "old_pipeline": {
+        "final_position_error_m": 280.42,
+        "rmse_position_error_m": 107.48,
+        "drift_percentage": 94.81,
+        "velocity_mae_mps": 2.97,
+        "velocity_rmse_mps": 3.71,
+        "zupt_activations": 160
+      },
+      "corrected_pipeline": {
+        "final_position_error_m": 348.01,
+        "rmse_position_error_m": 127.78,
+        "drift_percentage": 117.67,
+        "velocity_mae_mps": 2.56,
+        "velocity_rmse_mps": 2.99,
+        "zupt_activations": 5
+      }
+    }
+  },
+  "zupt_activation_breakdown_30s": {
+    "total_blackout_frames": 300,
+    "old_zupt_activations": 116,
+    "old_false_activation_rate_pct": 38.7,
+    "corrected_zupt_activations": 5,
+    "corrected_zupt_activation_timestamps_s": [174.24, 174.34, 174.44, 174.54, 174.64],
+    "vehicle_speed_during_corrected_zupt_mps": [0.62, 0.46, 0.32, 0.27, 0.17]
+  },
+  "test_suite_status": {
+    "total_tests": 117,
+    "passed": 117,
+    "failed": 0
+  },
+  "secondary_effects_identified": {
+    "heading_drift": "Velocity magnitude is now accurately integrated, but residual position error reflects heading/yaw orientation error during unobserved turns.",
+    "phone_to_vehicle_alignment": "Requires full 3D rotation transform rather than uncalibrated 1D axial feed.",
+    "gyro_bias_observability": "Gyro bias integrates into yaw drift during GNSS outages."
+  }
+}

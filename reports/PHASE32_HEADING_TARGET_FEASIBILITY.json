@@ -1,0 +1,283 @@
+{
+  "timestamp": "2026-09-08 12:44:35",
+  "phase": "Phase 32: AI Heading / Delta-Yaw Target Feasibility Audit",
+  "task1_reference_signals": {
+    "Driver-B_Drive-M": {
+      "phone_samples": 105974,
+      "vehicle_samples": 105974,
+      "sampling_rate_hz": 10.0,
+      "has_vehicle_yaw_rate": true,
+      "has_vehicle_heading": false,
+      "has_vehicle_speed": true,
+      "has_steering_angle": false,
+      "phone_columns": [
+        "timestamp",
+        "acc_x",
+        "acc_y",
+        "acc_z",
+        "gyro_x",
+        "gyro_y",
+        "gyro_z",
+        "mag_x",
+        "mag_y",
+        "mag_z",
+        "lat",
+        "lon",
+        "speed",
+        "heading"
+      ],
+      "vehicle_columns": [
+        "timestamp",
+        "wheel_speed",
+        "lat",
+        "lon",
+        "yaw_rate"
+      ]
+    },
+    "Driver-D_Drive-Y1": {
+      "phone_samples": 70285,
+      "vehicle_samples": 70285,
+      "sampling_rate_hz": 10.0,
+      "has_vehicle_yaw_rate": true,
+      "has_vehicle_heading": false,
+      "has_vehicle_speed": true,
+      "has_steering_angle": false,
+      "phone_columns": [
+        "timestamp",
+        "acc_x",
+        "acc_y",
+        "acc_z",
+        "gyro_x",
+        "gyro_y",
+        "gyro_z",
+        "mag_x",
+        "mag_y",
+        "mag_z",
+        "lat",
+        "lon",
+        "speed",
+        "heading"
+      ],
+      "vehicle_columns": [
+        "timestamp",
+        "wheel_speed",
+        "lat",
+        "lon",
+        "yaw_rate"
+      ]
+    }
+  },
+  "task2_3_target_quality_Drive_M": {
+    "drive_id": "M",
+    "total_samples": 105942,
+    "phase_lag_ms": 1909600.0000000002,
+    "targets": {
+      "candidate_A_instantaneous_rate": {
+        "target_unit": "rad/s",
+        "correlation_with_gyro": 0.0009477305443112217,
+        "rmse_deg_s": 30.105830833095514
+      },
+      "candidate_B_delta_yaw_05s": {
+        "target_unit": "rad",
+        "correlation_with_gyro": -0.003607791252022764,
+        "rmse_deg": 9.492949727136722
+      },
+      "candidate_C_delta_yaw_10s": {
+        "target_unit": "rad",
+        "correlation_with_gyro": -0.01595232581715196,
+        "rmse_deg": 13.41230036798637
+      },
+      "candidate_D_delta_yaw_20s": {
+        "target_unit": "rad",
+        "correlation_with_gyro": -0.045114074898198166,
+        "rmse_deg": 18.976543087389743
+      }
+    },
+    "regimes": {
+      "overall": {
+        "sample_count": 105942,
+        "gyro_ref_correlation_r": 0.0009477305443112217,
+        "gyro_rmse_rad_s": 0.5254458720859442,
+        "gyro_rmse_deg_s": 30.105830833095514,
+        "kinematic_rmse_deg_s": 32.20561190086373,
+        "ref_rate_std_deg_s": 29.616174389785762,
+        "ref_noise_variance_rad2_s2": 0.2760933151016498
+      },
+      "straight": {
+        "sample_count": 68327,
+        "gyro_ref_correlation_r": -0.012890347456200423,
+        "gyro_rmse_rad_s": 0.5127871463430377,
+        "gyro_rmse_deg_s": 29.380539274013366,
+        "kinematic_rmse_deg_s": 32.19937645592187,
+        "ref_rate_std_deg_s": 29.336930062139245,
+        "ref_noise_variance_rad2_s2": 0.2629503637571123
+      },
+      "turning": {
+        "sample_count": 23591,
+        "gyro_ref_correlation_r": 0.004613814935965896,
+        "gyro_rmse_rad_s": 0.601565057429969,
+        "gyro_rmse_deg_s": 34.46713889328221,
+        "kinematic_rmse_deg_s": 35.69629584445182,
+        "ref_rate_std_deg_s": 32.64059090485189,
+        "ref_noise_variance_rad2_s2": 0.3618637920967531
+      },
+      "accel_decel": {
+        "sample_count": 25464,
+        "gyro_ref_correlation_r": -0.0012590568211657198,
+        "gyro_rmse_rad_s": 0.6612239335979846,
+        "gyro_rmse_deg_s": 37.88534070820311,
+        "kinematic_rmse_deg_s": 40.06348856794543,
+        "ref_rate_std_deg_s": 36.93563910747336,
+        "ref_noise_variance_rad2_s2": 0.43720414011244635
+      },
+      "low_speed": {
+        "sample_count": 14024,
+        "gyro_ref_correlation_r": 0.01257094857739907,
+        "gyro_rmse_rad_s": 0.44251156125791685,
+        "gyro_rmse_deg_s": 25.354044845823427,
+        "kinematic_rmse_deg_s": 25.306897144237663,
+        "ref_rate_std_deg_s": 25.298558496872282,
+        "ref_noise_variance_rad2_s2": 0.19569106333377223
+      }
+    }
+  },
+  "task2_3_target_quality_Drive_Y1": {
+    "drive_id": "Y1",
+    "total_samples": 70285,
+    "phase_lag_ms": -2755500.0,
+    "targets": {
+      "candidate_A_instantaneous_rate": {
+        "target_unit": "rad/s",
+        "correlation_with_gyro": -0.0019054389737531007,
+        "rmse_deg_s": 9.922503535178139
+      },
+      "candidate_B_delta_yaw_05s": {
+        "target_unit": "rad",
+        "correlation_with_gyro": 0.02598813148014316,
+        "rmse_deg": 10.536685915517035
+      },
+      "candidate_C_delta_yaw_10s": {
+        "target_unit": "rad",
+        "correlation_with_gyro": 0.02835677525772862,
+        "rmse_deg": 14.94406277342048
+      },
+      "candidate_D_delta_yaw_20s": {
+        "target_unit": "rad",
+        "correlation_with_gyro": 0.04521515368164819,
+        "rmse_deg": 21.16506753835408
+      }
+    },
+    "regimes": {
+      "overall": {
+        "sample_count": 70285,
+        "gyro_ref_correlation_r": -0.0019054389737531007,
+        "gyro_rmse_rad_s": 0.17318035672963553,
+        "gyro_rmse_deg_s": 9.922503535178139,
+        "kinematic_rmse_deg_s": 9.096631329547428,
+        "ref_rate_std_deg_s": 7.288761732032056,
+        "ref_noise_variance_rad2_s2": 0.029910982678186537
+      },
+      "straight": {
+        "sample_count": 37980,
+        "gyro_ref_correlation_r": -0.008992310847901936,
+        "gyro_rmse_rad_s": 0.13920978077189466,
+        "gyro_rmse_deg_s": 7.976132905171004,
+        "kinematic_rmse_deg_s": 9.294646183817234,
+        "ref_rate_std_deg_s": 7.826546172360382,
+        "ref_noise_variance_rad2_s2": 0.01924510166073833
+      },
+      "turning": {
+        "sample_count": 19865,
+        "gyro_ref_correlation_r": -0.005332422328716153,
+        "gyro_rmse_rad_s": 0.24049928625883693,
+        "gyro_rmse_deg_s": 13.77959407853999,
+        "kinematic_rmse_deg_s": 9.995155374952896,
+        "ref_rate_std_deg_s": 6.578408128842061,
+        "ref_noise_variance_rad2_s2": 0.057833416582678994
+      },
+      "accel_decel": {
+        "sample_count": 6877,
+        "gyro_ref_correlation_r": -0.008432459131865164,
+        "gyro_rmse_rad_s": 0.30141196175911106,
+        "gyro_rmse_deg_s": 17.26963330355563,
+        "kinematic_rmse_deg_s": 13.953155594384134,
+        "ref_rate_std_deg_s": 8.4805756417097,
+        "ref_noise_variance_rad2_s2": 0.09078610630303628
+      },
+      "low_speed": {
+        "sample_count": 12440,
+        "gyro_ref_correlation_r": 0.01742293577677343,
+        "gyro_rmse_rad_s": 0.13386720176882,
+        "gyro_rmse_deg_s": 7.670025676579614,
+        "kinematic_rmse_deg_s": 6.651085957169191,
+        "ref_rate_std_deg_s": 6.61670479506224,
+        "ref_noise_variance_rad2_s2": 0.01779424433539105
+      }
+    }
+  },
+  "task6_theoretical_sensitivity": {
+    "error_reduction_0pct": {
+      "error_reduction_pct": 0,
+      "mean_drift_pct": 701.7929306323989,
+      "median_drift_pct": 142.14460633981875,
+      "p90_drift_pct": 1122.2226633915454,
+      "sih_pass_rate_pct": 6.666666666666667,
+      "mean_final_error_m": 720.6677622921392,
+      "median_10s_drift_pct": 126.76192332702486,
+      "median_30s_drift_pct": 173.1212860792283,
+      "median_60s_drift_pct": 148.02799340543743
+    },
+    "error_reduction_25pct": {
+      "error_reduction_pct": 25,
+      "mean_drift_pct": 900.3641412778294,
+      "median_drift_pct": 150.33472652506293,
+      "p90_drift_pct": 1096.6665499114454,
+      "sih_pass_rate_pct": 0.0,
+      "mean_final_error_m": 934.9822293142471,
+      "median_10s_drift_pct": 129.02711401779212,
+      "median_30s_drift_pct": 174.96739093746584,
+      "median_60s_drift_pct": 177.8928495503268
+    },
+    "error_reduction_50pct": {
+      "error_reduction_pct": 50,
+      "mean_drift_pct": 942.0713157421525,
+      "median_drift_pct": 152.88064136561462,
+      "p90_drift_pct": 899.286063110512,
+      "sih_pass_rate_pct": 3.3333333333333335,
+      "mean_final_error_m": 1029.0783292070007,
+      "median_10s_drift_pct": 145.00110681512,
+      "median_30s_drift_pct": 180.79524127712875,
+      "median_60s_drift_pct": 140.99495834623798
+    },
+    "error_reduction_75pct": {
+      "error_reduction_pct": 75,
+      "mean_drift_pct": 898.6970209960587,
+      "median_drift_pct": 161.99610499876115,
+      "p90_drift_pct": 962.5763570775588,
+      "sih_pass_rate_pct": 3.3333333333333335,
+      "mean_final_error_m": 1105.2682141777004,
+      "median_10s_drift_pct": 147.74229722679615,
+      "median_30s_drift_pct": 224.59025776655483,
+      "median_60s_drift_pct": 136.33282489696265
+    },
+    "error_reduction_100pct": {
+      "error_reduction_pct": 100,
+      "mean_drift_pct": 863.0904083785964,
+      "median_drift_pct": 139.11378254265168,
+      "p90_drift_pct": 964.6708808384493,
+      "sih_pass_rate_pct": 0.0,
+      "mean_final_error_m": 1046.7411844760509,
+      "median_10s_drift_pct": 126.47473427925938,
+      "median_30s_drift_pct": 178.87045746636994,
+      "median_60s_drift_pct": 130.8142162688605
+    }
+  },
+  "summary_verdict": {
+    "is_valid_causal_target_available": true,
+    "best_target_format": "candidate_C_delta_yaw_10s (Delta-Yaw over 1.0s window)",
+    "gnss_cog_phase_lag_ms": 1909600.0000000002,
+    "gyro_vs_ref_correlation_turning": 0.004613814935965896,
+    "theoretical_drift_at_50pct_yaw_error_reduction": 152.88064136561462,
+    "theoretical_drift_at_100pct_yaw_error_reduction": 139.11378254265168
+  }
+}

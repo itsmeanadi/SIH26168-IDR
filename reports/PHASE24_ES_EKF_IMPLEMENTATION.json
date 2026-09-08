@@ -1,0 +1,66 @@
+{
+  "phase": "PHASE_24",
+  "report_id": "REP-SIH26168-PHASE24-ES-EKF-IMPL-20260908",
+  "project": "SIH 2026 Problem Statement 26168 - AI-ML Intelligent Dead Reckoning (IDR)",
+  "title": "Phase 24 — 15-State 3D Error-State Extended Kalman Filter (ES-EKF) Implementation",
+  "status": "APPROVED",
+  "timestamp": "2026-09-08T10:07:30+05:30",
+  "state_definition": {
+    "nominal_state_dim": 16,
+    "error_state_dim": 15,
+    "nominal_vector": ["p(3)", "v(3)", "q(4)", "ba(3)", "bg(3)"],
+    "error_vector": ["delta_p(3)", "delta_v(3)", "delta_theta(3)", "delta_ba(3)", "delta_bg(3)"],
+    "attitude_error_convention": "Right-Multiplicative (Body-Frame): q_true = q (x) exp(0.5 * delta_theta)"
+  },
+  "mechanization": {
+    "nav_frame": "East-North-Up (ENU)",
+    "body_frame": "Forward-Lateral-Up (FLU)",
+    "gravity_vector": [0.0, 0.0, -9.80665],
+    "discrete_propagation": "p_k+1 = p_k + v_k * dt + 0.5 * a_nav * dt^2, v_k+1 = v_k + a_nav * dt"
+  },
+  "discrete_transition_matrix": {
+    "gyro_bias_coupling": "F_theta_bg = -J_r(omega_b * dt) * dt (Exact SO(3) Right Jacobian)",
+    "position_attitude_coupling": "F_p_theta = -0.5 * R * [f_b]_x * dt^2",
+    "position_bias_coupling": "F_p_ba = -0.5 * R * dt^2",
+    "attitude_transition": "F_theta_theta = R(delta_q)^T"
+  },
+  "measurement_models": [
+    {"name": "gnss_pos", "H_dim": [3, 15], "gate": "chi2_3d = 11.345"},
+    {"name": "gnss_vel", "H_dim": [3, 15], "gate": "chi2_3d = 11.345"},
+    {"name": "ai_velocity", "H_dim": [1, 15], "gate": "3-sigma = 9.0"},
+    {"name": "nhc", "H_dim": [2, 15], "gate": "chi2_2d = 9.210"},
+    {"name": "zupt", "H_dim": [3, 15], "gate": "chi2_3d = 11.345"},
+    {"name": "zaru", "H_dim": [3, 15], "gate": "chi2_3d = 11.345"}
+  ],
+  "finite_difference_results": {
+    "F_d_max_error": 1.4095e-07,
+    "H_ai_max_error": 1.5169e-06,
+    "H_nhc_max_error": 1.5259e-06,
+    "H_pos_max_error": 0.0,
+    "H_vel_max_error": 0.0,
+    "H_zupt_max_error": 0.0,
+    "H_zaru_max_error": 0.0,
+    "gravity_tilt_cancellation_error": 0.0,
+    "error_injection_reset_error": 1.4957e-07
+  },
+  "standstill_gnss_cog_fix": {
+    "file": "src/idr/filters/fusion.py",
+    "parameter": "min_cog_speed_mps = 1.5",
+    "status": "IMPLEMENTED_AND_TESTED"
+  },
+  "test_suite_status": {
+    "original_count": 123,
+    "new_count": 147,
+    "passed": 147,
+    "failed": 0,
+    "execution_time_sec": 10.17
+  },
+  "files_created_or_modified": [
+    "src/idr/filters/es_ekf.py",
+    "src/idr/filters/__init__.py",
+    "src/idr/filters/fusion.py",
+    "tests/test_es_ekf.py",
+    "reports/PHASE24_ES_EKF_IMPLEMENTATION.md",
+    "reports/PHASE24_ES_EKF_IMPLEMENTATION.json"
+  ]
+}

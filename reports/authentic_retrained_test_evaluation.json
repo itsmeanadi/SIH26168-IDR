@@ -1,0 +1,91 @@
+{
+  "model_name": "VelocityEstimatorNet",
+  "dataset": "authentic-iovnbd (Driver-Disjoint)",
+  "train_windows": 88218,
+  "val_windows": 10581,
+  "test_windows": 7012,
+  "best_epoch": 6,
+  "best_val_huber_loss": 1.737754273500236,
+  "test_metrics": {
+    "mae_mps": 2.5666894912719727,
+    "rmse_mps": 3.4462764263153076,
+    "max_abs_error_mps": 16.480445861816406,
+    "median_abs_error_mps": 2.0279479026794434,
+    "p90_abs_error_mps": 5.615166664123535,
+    "p95_abs_error_mps": 6.89850378036499,
+    "p99_abs_error_mps": 10.417529106140137,
+    "mean_signed_bias_mps": -0.45487797260284424,
+    "pearson_correlation": 0.7728268870633087,
+    "r_squared": 0.5767557621002197
+  },
+  "speed_regime_breakdown": {
+    "Stationary (< 0.5 m/s)": {
+      "count": 904,
+      "share_percent": 12.892184826012551,
+      "mae_mps": 1.3104957342147827,
+      "rmse_mps": 3.240297555923462,
+      "median_abs_mps": 0.13797920942306519,
+      "max_err_mps": 16.480445861816406,
+      "bias_mps": 1.2865263223648071
+    },
+    "Low Speed (0.5 - 5.0 m/s)": {
+      "count": 1039,
+      "share_percent": 14.817455790074158,
+      "mae_mps": 2.4736196994781494,
+      "rmse_mps": 3.2937088012695312,
+      "median_abs_mps": 1.8103703260421753,
+      "max_err_mps": 10.427460670471191,
+      "bias_mps": 0.8599145412445068
+    },
+    "Medium Speed (5.0 - 15.0 m/s)": {
+      "count": 4404,
+      "share_percent": 62.806617227609806,
+      "mae_mps": 2.4268991947174072,
+      "rmse_mps": 2.9868545532226562,
+      "median_abs_mps": 2.1074228286743164,
+      "max_err_mps": 12.938678741455078,
+      "bias_mps": -0.39488697052001953
+    },
+    "High Speed (>= 15.0 m/s)": {
+      "count": 665,
+      "share_percent": 9.48374215630348,
+      "mae_mps": 5.345537185668945,
+      "rmse_mps": 5.910062313079834,
+      "median_abs_mps": 5.1122026443481445,
+      "max_err_mps": 13.73173713684082,
+      "bias_mps": -5.273673057556152
+    }
+  },
+  "baseline_comparison": {
+    "AI (VelocityEstimatorNet)": {
+      "mae_mps": 2.5666894912719727,
+      "rmse_mps": 3.4462764263153076,
+      "r2": 0.5767557621002197,
+      "corr": 0.7728268870633087
+    },
+    "Persistence Baseline (1-second lag)": {
+      "mae_mps": 0.501277506351471,
+      "rmse_mps": 0.8557597398757935,
+      "r2": 0.9739027619361877,
+      "corr": 0.9869495173669912
+    },
+    "Training Mean Baseline (13.21 m/s)": {
+      "mae_mps": 5.814925670623779,
+      "rmse_mps": 7.190626621246338,
+      "r2": -0.8425712585449219,
+      "corr": 0.0
+    },
+    "Training Median Baseline (14.28 m/s)": {
+      "mae_mps": 5.254830360412598,
+      "rmse_mps": 6.5509934425354,
+      "r2": -0.5293437242507935,
+      "corr": 0.0
+    },
+    "Zero Predictor (0.00 m/s)": {
+      "mae_mps": 8.346583366394043,
+      "rmse_mps": 9.885688781738281,
+      "r2": -2.4826087951660156,
+      "corr": 0.0
+    }
+  }
+}

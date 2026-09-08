@@ -1,0 +1,53 @@
+{
+  "audit_version": "1.0.0",
+  "timestamp": "2026-09-08T02:23:00Z",
+  "phase": "PHASE 20 — GNSS BLACKOUT FORENSIC AUDIT",
+  "problem_statement": "SIH 2026 PS 26168",
+  "scientific_verdict": "BLACKOUT PIPELINE BUG FOUND — CORRECTION REQUIRED",
+  "audit_summary": {
+    "primary_root_cause": "False Stationary (ZUPT) Triggering during steady-state constant velocity motion",
+    "mechanism": "StationaryDetector uses purely acceleration variance (acc_var < 0.15) and gravity norm. During smooth straight-line vehicle cruising (constant speed), acceleration variance is near-zero and gravity norm matches 9.81 m/s^2. Consequently, StationaryDetector falsely returns is_stationary=True, triggering apply_zupt() with sigma_v=0.01 m/s, which forcefully clamps EKF velocity to 0.0 m/s every frame and freezes dead reckoning position integration despite valid AI speed estimates.",
+    "secondary_root_cause": "Heading / Yaw Drift unobservability during blackout. Without absolute heading reference (magnetometer or visual odometry), gyro bias and angular integration errors rotate the velocity vector away from true ground truth track.",
+    "tertiary_root_cause": "Phone-to-Vehicle IMU axis mapping: in raw evaluation ablation scripts, phone acc_x was directly fed as forward acceleration instead of transforming through calibrated alignment matrix."
+  },
+  "initialization_audit": {
+    "drive_id": "Y1",
+    "init_duration_s": 60.0,
+    "blackout_start_sample": 600,
+    "blackout_start_time_s": 174.24,
+    "init_position_error_m": 0.07,
+    "init_estimated_heading_deg": -65.44,
+    "init_gyro_bias_radps": 0.0008,
+    "init_accel_bias_mps2": -0.1492,
+    "init_pos_uncertainty_m": 0.45,
+    "verdict": "Initialization is physically valid and grounded in 60s pre-blackout GNSS track."
+  },
+  "covariance_provenance_audit": {
+    "issue_identified": "Phase 19 report inadvertently cited held-out Driver D test metrics (MAE 2.57 m/s, RMSE 3.45 m/s) when referencing validation-tuned uncertainty.",
+    "remedy_validation_only": {
+      "dataset": "Driver B / Drive M (Validation Split)",
+      "windows_count": 10581,
+      "val_mae_mps": 2.152918,
+      "val_rmse_mps": 3.048742,
+      "val_bias_mps": -0.491099,
+      "val_r2": 0.710417,
+      "val_pearson_r": 0.847495,
+      "defensible_sigma_ai": 3.05
+    },
+    "verdict": "Validation-only statistics strictly justify the base sigma_ai = 3.0 m/s without touching held-out Driver D test data."
+  },
+  "jacobian_verification": {
+    "method": "Central finite differences (eps = 1e-6) vs Analytical Jacobian H_ai",
+    "max_discrepancy": 3.33e-10,
+    "verdict": "EXACT MATHEMATICAL AGREEMENT"
+  },
+  "repeatability": {
+    "run1_vs_run2_max_diff": 0.0,
+    "verdict": "100% DETERMINISTIC & REPEATABLE"
+  },
+  "metric_definition_audit": {
+    "drift_formula": "final_position_error_m / ground_truth_blackout_distance_m * 100",
+    "distance_source": "Ground truth GPS trajectory Euclidean delta summation (NOT estimated distance)",
+    "verdict": "METRIC IMPLEMENTATION MATHEMATICALLY RIGOROUS"
+  }
+}

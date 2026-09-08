@@ -1,0 +1,124 @@
+{
+  "specification_metadata": {
+    "phase": 23,
+    "document_id": "REP-SIH26168-PHASE23-SPEC-20260908",
+    "project": "SIH 2026 Problem Statement 26168 - AI-ML Intelligent Dead Reckoning (IDR)",
+    "title": "15-State 3D Error-State Extended Kalman Filter (ES-EKF) Architecture Specification",
+    "author_role": "Autonomous Senior Technical & Navigation Lead",
+    "date": "2026-09-08",
+    "status": "APPROVED",
+    "git_head": "450d8e53c2b514de6020a29ac3803c0067daf9a1"
+  },
+  "executive_conclusion": {
+    "verdict": "PHASE 23 SPECIFICATION APPROVED — READY FOR CONTROLLED IMPLEMENTATION IN PHASE 24/25",
+    "core_finding": "Legacy 9-state planar EKF is mathematically and physically limited for 3D navigation and motorcycles; replacing with 15-state quaternion ES-EKF with full 3D attitude and 3D gravity compensation"
+  },
+  "state_definitions": {
+    "nominal_state": {
+      "dimension": 16,
+      "parameters": [
+        {"name": "p_E", "type": "position", "frame": "local_enu", "unit": "m", "index": 0},
+        {"name": "p_N", "type": "position", "frame": "local_enu", "unit": "m", "index": 1},
+        {"name": "p_U", "type": "position", "frame": "local_enu", "unit": "m", "index": 2},
+        {"name": "v_E", "type": "velocity", "frame": "local_enu", "unit": "m/s", "index": 3},
+        {"name": "v_N", "type": "velocity", "frame": "local_enu", "unit": "m/s", "index": 4},
+        {"name": "v_U", "type": "velocity", "frame": "local_enu", "unit": "m/s", "index": 5},
+        {"name": "q_w", "type": "quaternion_scalar", "frame": "body_to_enu", "unit": "dimensionless", "index": 6},
+        {"name": "q_x", "type": "quaternion_vector", "frame": "body_to_enu", "unit": "dimensionless", "index": 7},
+        {"name": "q_y", "type": "quaternion_vector", "frame": "body_to_enu", "unit": "dimensionless", "index": 8},
+        {"name": "q_z", "type": "quaternion_vector", "frame": "body_to_enu", "unit": "dimensionless", "index": 9},
+        {"name": "b_ax", "type": "accel_bias", "frame": "body", "unit": "m/s^2", "index": 10},
+        {"name": "b_ay", "type": "accel_bias", "frame": "body", "unit": "m/s^2", "index": 11},
+        {"name": "b_az", "type": "accel_bias", "frame": "body", "unit": "m/s^2", "index": 12},
+        {"name": "b_wx", "type": "gyro_bias", "frame": "body", "unit": "rad/s", "index": 13},
+        {"name": "b_wy", "type": "gyro_bias", "frame": "body", "unit": "rad/s", "index": 14},
+        {"name": "b_wz", "type": "gyro_bias", "frame": "body", "unit": "rad/s", "index": 15}
+      ]
+    },
+    "error_state": {
+      "dimension": 15,
+      "parameters": [
+        {"name": "delta_p_E", "symbol": "delta_p[0]", "unit": "m", "index": 0},
+        {"name": "delta_p_N", "symbol": "delta_p[1]", "unit": "m", "index": 1},
+        {"name": "delta_p_U", "symbol": "delta_p[2]", "unit": "m", "index": 2},
+        {"name": "delta_v_E", "symbol": "delta_v[0]", "unit": "m/s", "index": 3},
+        {"name": "delta_v_N", "symbol": "delta_v[1]", "unit": "m/s", "index": 4},
+        {"name": "delta_v_U", "symbol": "delta_v[2]", "unit": "m/s", "index": 5},
+        {"name": "delta_theta_x", "symbol": "delta_theta[0]", "unit": "rad", "index": 6},
+        {"name": "delta_theta_y", "symbol": "delta_theta[1]", "unit": "rad", "index": 7},
+        {"name": "delta_theta_z", "symbol": "delta_theta[2]", "unit": "rad", "index": 8},
+        {"name": "delta_b_ax", "symbol": "delta_ba[0]", "unit": "m/s^2", "index": 9},
+        {"name": "delta_b_ay", "symbol": "delta_ba[1]", "unit": "m/s^2", "index": 10},
+        {"name": "delta_b_az", "symbol": "delta_ba[2]", "unit": "m/s^2", "index": 11},
+        {"name": "delta_b_wx", "symbol": "delta_bw[0]", "unit": "rad/s", "index": 12},
+        {"name": "delta_b_wy", "symbol": "delta_bw[1]", "unit": "rad/s", "index": 13},
+        {"name": "delta_b_wz", "symbol": "delta_bw[2]", "unit": "rad/s", "index": 14}
+      ]
+    }
+  },
+  "conventions": {
+    "nav_frame": "East-North-Up (ENU), right-handed tangent plane",
+    "body_frame": "Forward-Lateral-Up (FLU), right-handed vehicle body",
+    "quaternion_convention": "Hamilton: q = [q_w, q_x, q_y, q_z]^T with q_w scalar",
+    "quaternion_multiplication": "p (x) q = [p_w*q_w - p_v.q_v, p_w*q_v + q_w*p_v + p_v x q_v]",
+    "attitude_error_injection": "q_true = q (x) [1, 0.5 * delta_theta]^T, normalized",
+    "gravity_vector_enu": [0.0, 0.0, -9.80665],
+    "gravity_mechanization": "a_n = R(q) * (a_m - b_a) + g_n"
+  },
+  "measurement_models": [
+    {
+      "name": "GNSS Position",
+      "dimension": 3,
+      "observation": "z_pos = [p_E, p_N, p_U]",
+      "jacobian_h": "H_pos = [I_3, 0_3x3, 0_3x3, 0_3x3, 0_3x3]",
+      "gating": "NIS <= 11.34 (chi2 3-dof 99%)"
+    },
+    {
+      "name": "GNSS Velocity",
+      "dimension": 3,
+      "observation": "z_vel = [v_E, v_N, v_U]",
+      "jacobian_h": "H_vel = [0_3x3, I_3, 0_3x3, 0_3x3, 0_3x3]",
+      "gating": "NIS <= 11.34 (chi2 3-dof 99%)"
+    },
+    {
+      "name": "AI Forward Velocity",
+      "dimension": 1,
+      "observation": "z_ai = v_fwd_est",
+      "model": "h(x) = e1^T * R(q)^T * v",
+      "jacobian_h": "H_ai = [0_1x3, e1^T*R^T, [0, -v_bz, v_by], 0_1x3, 0_1x3]",
+      "gating": "NIS <= 9.0 (3.0-sigma)"
+    },
+    {
+      "name": "Non-Holonomic Constraints (NHC)",
+      "dimension": 2,
+      "observation": "z_nhc = [0, 0]",
+      "model": "h(x) = [v_by, v_bz]",
+      "jacobian_h": "H_nhc = [0_2x3, [e2^T*R^T; e3^T*R^T], [v_bz, 0, -v_bx; -v_by, v_bx, 0], 0_2x3, 0_2x3]",
+      "gating": "Adaptive sigma_lat(phi) on two-wheeler"
+    },
+    {
+      "name": "Zero-Velocity Update (ZUPT)",
+      "dimension": 3,
+      "observation": "z_zupt = [0, 0, 0]",
+      "jacobian_h": "H_zupt = [0_3x3, I_3, 0_3x3, 0_3x3, 0_3x3]",
+      "gating": "Active only when StationaryDetector is True"
+    },
+    {
+      "name": "Zero Angular Rate Update (ZARU)",
+      "dimension": 3,
+      "observation": "z_zaru = [0, 0, 0]",
+      "jacobian_h": "H_zaru = [0_3x3, 0_3x3, 0_3x3, 0_3x3, I_3]",
+      "gating": "Active only when StationaryDetector is True"
+    }
+  ],
+  "roadmap": {
+    "phase_23": "Specification & Audit Approved",
+    "phase_24": "Standstill GNSS Heading Filter & Calibration Enforcement",
+    "phase_25": "15-State ES-EKF Core Implementation & 20 Unit Tests",
+    "phase_26": "Two-Wheeler Lean Dynamics & Adaptive NHC Integration",
+    "phase_27": "Held-Out Drive Blackout Benchmark (Y1 & M)",
+    "phase_28": "Authentic OSM Map-Matching Benchmark",
+    "phase_29": "Physical Motorcycle Field Telemetry Campaign",
+    "phase_30": "Final Demonstration Package & SIH Documentation"
+  }
+}

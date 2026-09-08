@@ -2,6 +2,12 @@
 **Smart India Hackathon Problem Statement 26168 (ISRO)**
 *Seamless navigation during GNSS outage using smartphone-grade IMU sensor fusion, deep learning forward-velocity estimation, Non-Holonomic Constraints (NHC), and OpenStreetMap map-matching.*
 
+> [!NOTE]
+> **SYSTEM STATUS & PROVENANCE CLASSIFICATION**  
+> - **Core Algorithms (Implemented & Mathematically Validated)**: 9-State Error-State EKF with full 4-derivative velocity Jacobian, pitch gravity compensation, Non-Holonomic Constraints (NHC), robust vibration-resistant StationaryDetector (ZUPT/ZARU), and true Hidden Markov Model (HMM) Viterbi trellis map matching.
+> - **Telemetry & Integration**: Multi-rate 100Hz/200Hz phone-to-vehicle dynamic aligner, WebSocket/REST field recorder, and sub-15ms real-time navigation engine.
+> - **Historical Benchmarks**: Stored numbers are **Historical Synthetic Baselines** for CI/software pipeline integration. Authentic field training and verification will execute via strict zero-leakage safety gates (`ScientificEvaluator`, `TrainingSafetyGate`).
+
 ---
 
 ## 🚀 One-Command Quickstart

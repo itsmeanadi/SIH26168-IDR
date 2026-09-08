@@ -176,6 +176,22 @@ class IDREngineClient {
     }).then((r) => r.json());
   }
 
+  async getSystemHealth() {
+    return fetch(`${this.baseUrl}/api/system/health`).then((r) => r.json());
+  }
+
+  async resetNavigation(params = {}) {
+    return fetch(`${this.baseUrl}/api/navigation/reset`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    }).then((r) => r.json());
+  }
+
+  async getSessionSummary() {
+    return fetch(`${this.baseUrl}/api/session/summary`).then((r) => r.json());
+  }
+
   async getRecorderStatus() {
     return fetch(`${this.baseUrl}/api/recorder/status`).then((r) => r.json());
   }

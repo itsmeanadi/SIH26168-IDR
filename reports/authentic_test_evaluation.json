@@ -1,0 +1,48 @@
+{
+  "model_name": "VelocityEstimatorNet",
+  "checkpoint": "models\\authentic\\velocity_net.pt",
+  "test_dataset": "data\\processed\\authentic\\test_data.npz",
+  "test_driver": "Driver D (Drive Y1)",
+  "test_windows_count": 7024,
+  "overall_metrics": {
+    "mae_mps": 5.399999141693115,
+    "rmse_mps": 6.812690258026123,
+    "max_abs_error_mps": 24.476085662841797,
+    "mean_bias_mps": 0.187578484416008,
+    "std_error_mps": 6.810107231140137,
+    "p50_abs_error_mps": 4.583189010620117,
+    "p90_abs_error_mps": 11.45949935913086,
+    "p95_abs_error_mps": 13.447423934936523,
+    "p99_abs_error_mps": 17.362869262695312
+  },
+  "speed_range_breakdown": {
+    "Stationary (< 0.5 m/s)": {
+      "count": 912,
+      "share_percent": 12.984054669703873,
+      "mae_mps": 7.477502346038818,
+      "rmse_mps": 8.830642700195312,
+      "max_err_mps": 24.476085662841797
+    },
+    "Low Speed (0.5 - 5.0 m/s)": {
+      "count": 1045,
+      "share_percent": 14.877562642369021,
+      "mae_mps": 6.196862697601318,
+      "rmse_mps": 7.4488630294799805,
+      "max_err_mps": 23.257701873779297
+    },
+    "Medium Speed (5.0 - 15.0 m/s)": {
+      "count": 4400,
+      "share_percent": 62.64236902050114,
+      "mae_mps": 4.256232261657715,
+      "rmse_mps": 5.3850321769714355,
+      "max_err_mps": 18.973323822021484
+    },
+    "High Speed (>= 15.0 m/s)": {
+      "count": 667,
+      "share_percent": 9.496013667425968,
+      "mae_mps": 8.856024742126465,
+      "rmse_mps": 10.193702697753906,
+      "max_err_mps": 19.82282066345215
+    }
+  }
+}

@@ -1,157 +1,443 @@
 /**
- * IDR Live Diagnostics & Four USPs UI Controller.
+ * IDR Navigation Diagnostics & State Presentation Controller.
+ * Manages Cockpit Gauges, Subtle Outage Toasts, Bottom Sheet Telemetry, Diagnostics Modal, and Session Summary.
  */
 
 class IDRDiagnosticUI {
   constructor() {
-    this.speedValEl = document.getElementById('val-speed');
+    // Primary HUD Elements
     this.speedKmhEl = document.getElementById('val-speed-kmh');
-    this.headingValEl = document.getElementById('val-heading');
-    this.leanValEl = document.getElementById('val-lean');
-    this.bikeIconEl = document.getElementById('lean-bike-icon');
+    this.speedMpsEl = document.getElementById('val-speed-mps');
+    this.headingDisplayEl = document.getElementById('val-heading-display');
+    this.leanTextEl = document.getElementById('val-lean-text');
+    this.leanMarkerEl = document.getElementById('lean-indicator-marker');
     this.modePillEl = document.getElementById('nav-mode-pill');
-    
-    // USP 1
-    this.trustScoreEl = document.getElementById('val-trust-score');
-    this.trustBarEl = document.getElementById('bar-trust');
-    this.gnssStatusEl = document.getElementById('val-gnss-status');
-    
-    // USP 2
-    this.posUncEl = document.getElementById('val-pos-unc');
-    this.headingUncEl = document.getElementById('val-heading-unc');
-    this.imuNoiseEl = document.getElementById('val-imu-noise');
-    this.alignedStatusEl = document.getElementById('val-aligned');
-    this.drDistEl = document.getElementById('val-dr-dist');
-    
-    // USP 3
-    this.blackspotCountEl = document.getElementById('val-blackspot-count');
-    
-    // USP 4 (Crash Modal)
-    this.crashModalEl = document.getElementById('crash-modal');
-    this.crashCountdownEl = document.getElementById('crash-countdown');
-    this.crashImpactEl = document.getElementById('crash-impact-g');
-    this.crashLocEl = document.getElementById('crash-location-text');
-    this.crashSosBtn = document.getElementById('btn-dispatch-sos');
-    this.crashCancelBtn = document.getElementById('btn-cancel-crash');
-    
-    this._crashCountdownTimer = null;
-    this._activeCrashAlert = null;
+    this.modeTextEl = document.getElementById('nav-mode-text');
+
+    // Toasts
+    this.outageToastEl = document.getElementById('outage-toast');
+    this.recoveryToastEl = document.getElementById('recovery-toast');
+    this.crashToastEl = document.getElementById('crash-toast');
+    this.crashAlertDetailsEl = document.getElementById('crash-alert-details');
+    this.outageTimerEl = document.getElementById('val-outage-timer');
+    this.outageUncEl = document.getElementById('val-outage-unc');
+
+    // Expanded Bottom Sheet Telemetry
+    this.expValUncEl = document.getElementById('exp-val-unc');
+    this.expValAiSpeedEl = document.getElementById('exp-val-ai-speed');
+    this.expValDrDistEl = document.getElementById('exp-val-dr-dist');
+    this.expValTrustEl = document.getElementById('exp-val-trust');
+
+    // Diagnostics Modal Elements
+    this.diagModalEl = document.getElementById('modal-diagnostics');
+    this.diagPipeModeEl = document.getElementById('diag-pipe-mode');
+    this.diagSrcSpeedEl = document.getElementById('diag-src-speed');
+    this.diagSrcHeadingEl = document.getElementById('diag-src-heading');
+    this.diagSrcTrajectoryEl = document.getElementById('diag-src-trajectory');
+    this.diagLatLonEl = document.getElementById('diag-latlon');
+    this.diagSpeedFullEl = document.getElementById('diag-speed-full');
+    this.diagHeadingFullEl = document.getElementById('diag-heading-full');
+    this.diagDrDistEl = document.getElementById('diag-dr-dist');
+    this.diagGnssStateEl = document.getElementById('diag-gnss-state');
+    this.diagTrustScoreEl = document.getElementById('diag-trust-score');
+    this.diagBlackspotsEl = document.getElementById('diag-blackspots-count');
+    this.diagAiSpeedEl = document.getElementById('diag-ai-speed');
+    this.diagAiAcceptRateEl = document.getElementById('diag-ai-accept-rate');
+    this.diagPosUncEl = document.getElementById('diag-pos-unc');
+    this.diagHeadingUncEl = document.getElementById('diag-heading-unc');
+    this.diagGravityStatusEl = document.getElementById('diag-gravity-status');
+    this.diagHwAccelEl = document.getElementById('diag-hw-accel');
+    this.diagHwGyroEl = document.getElementById('diag-hw-gyro');
+    this.diagHwOriEl = document.getElementById('diag-hw-ori');
+    this.diagHwGpsEl = document.getElementById('diag-hw-gps');
+    this.diagDynLeanEl = document.getElementById('diag-dyn-lean');
+    this.diagCrashStatusEl = document.getElementById('diag-crash-status');
+
+    // Cached telemetry & mode state for instant modal refresh
+    this.lastState = null;
+    this.lastTelem = null;
+    this.currentMode = 'standby';
+    this.modeLabel = '';
+
+    // Session Summary Modal Elements
+    this.summaryModalEl = document.getElementById('modal-summary');
+    this.sumTotalDistEl = document.getElementById('sum-total-dist');
+    this.sumDurationEl = document.getElementById('sum-duration');
+    this.sumDrDistEl = document.getElementById('sum-dr-dist');
+    this.sumVehTypeEl = document.getElementById('sum-veh-type');
+    this.sumOutageTimeEl = document.getElementById('sum-outage-time');
+    this.sumPeakUncEl = document.getElementById('sum-peak-unc');
+    this.sumAiRateEl = document.getElementById('sum-ai-rate');
+    this.sumBlackspotsEl = document.getElementById('sum-blackspots');
+
+    // Internal Tracking State
+    this.wasInBlackout = false;
+    this.blackoutStartTime = null;
+    this.blackoutElapsedTimer = null;
+    this._recoveryTimeout = null;
+
+    this.navigationStartTime = Date.now();
+    this.peakUncertainty = 1.2;
+    this.totalDrDistance = 0.0;
+  }
+
+  resetSession() {
+    this.navigationStartTime = Date.now();
+    this.peakUncertainty = 1.2;
+    this.totalDrDistance = 0.0;
+    this.wasInBlackout = false;
+    if (this.blackoutElapsedTimer) {
+      clearInterval(this.blackoutElapsedTimer);
+      this.blackoutElapsedTimer = null;
+    }
   }
 
   update(state) {
     if (!state) return;
 
-    // 1. Primary Cockpit Gauges
-    const speedMps = state.forward_speed_mps || 0.0;
-    const speedKmh = (speedMps * 3.6).toFixed(1);
-    if (this.speedValEl) this.speedValEl.textContent = speedMps.toFixed(1);
-    if (this.speedKmhEl) this.speedKmhEl.textContent = `${speedKmh} km/h`;
+    this.lastState = state;
 
-    if (this.headingValEl) this.headingValEl.textContent = `${Math.round(state.heading_deg || 0)}°`;
-
-    const leanDeg = state.lean_angle_deg || 0.0;
-    if (this.leanValEl) this.leanValEl.textContent = `${Math.abs(leanDeg).toFixed(1)}° ${leanDeg > 0 ? 'R' : leanDeg < 0 ? 'L' : ''}`;
-    if (this.bikeIconEl) {
-      this.bikeIconEl.style.transform = `rotate(${leanDeg}deg)`;
-    }
-
-    // Nav Mode Pill
-    if (this.modePillEl) {
-      const mode = state.nav_mode || 'GNSS_INS_FULL';
-      this.modePillEl.textContent = mode.replace(/_/g, ' ');
-      this.modePillEl.className = 'nav-mode-badge';
-
-      if (mode.includes('GNSS')) {
-        this.modePillEl.classList.add('mode-gnss');
-      } else if (mode.includes('DEAD_RECKONING')) {
-        this.modePillEl.classList.add('mode-dr');
-      } else if (mode.includes('REACQUISITION')) {
-        this.modePillEl.classList.add('mode-reacq');
+    // 0. Data Provenance & Pipeline Integrity
+    if (this.diagPipeModeEl) {
+      if (this.currentMode === 'live') {
+        const hz = (this.lastTelem && this.lastTelem.accel && this.lastTelem.accel.rateHz) || 50;
+        this.diagPipeModeEl.textContent = `● LIVE PHYSICAL DEVICE (${hz} Hz)`;
+        this.diagPipeModeEl.className = 'field-value status-active';
+      } else if (this.currentMode === 'replay') {
+        this.diagPipeModeEl.textContent = `○ REPLAY DEMO (${this.modeLabel || 'IO-VNBD Dataset'})`;
+        this.diagPipeModeEl.className = 'field-value';
       } else {
-        this.modePillEl.classList.add('mode-stationary');
+        this.diagPipeModeEl.textContent = '○ STANDBY (No Active Session)';
+        this.diagPipeModeEl.className = 'field-value text-muted';
       }
     }
 
-    // 2. USP 1: GNSS Trust Engine
-    const trust = state.gnss_trust_score !== undefined ? state.gnss_trust_score : 1.0;
-    const trustPct = Math.round(trust * 100);
-    if (this.trustScoreEl) this.trustScoreEl.textContent = `${trustPct}%`;
-    if (this.trustBarEl) {
-      this.trustBarEl.style.width = `${trustPct}%`;
-      this.trustBarEl.style.backgroundColor = trust > 0.7 ? '#10b981' : trust > 0.4 ? '#f59e0b' : '#f43f5e';
-    }
-    if (this.gnssStatusEl) this.gnssStatusEl.textContent = state.gnss_status || 'TRUSTED';
-
-    // 3. USP 2: Diagnostics
-    const diag = state.diagnostics || {};
-    if (this.posUncEl) this.posUncEl.textContent = `±${diag.pos_uncertainty_1sigma_m || state.pos_uncertainty_m || 0.0} m`;
-    if (this.headingUncEl) this.headingUncEl.textContent = `±${diag.heading_uncertainty_deg || 1.2}°`;
-    if (this.imuNoiseEl) this.imuNoiseEl.textContent = `${diag.imu_acc_noise_mps2 || 0.04} m/s²`;
-    if (this.alignedStatusEl) {
-      this.alignedStatusEl.textContent = state.is_aligned ? 'CALIBRATED' : 'ALIGNING...';
-      this.alignedStatusEl.style.color = state.is_aligned ? '#10b981' : '#f59e0b';
-    }
-    if (this.drDistEl) this.drDistEl.textContent = `${(diag.total_dr_distance_m || 0).toFixed(1)} m`;
-
-    // 4. USP 4: Crash Alert check
-    if (state.active_crash_alert && !this._activeCrashAlert) {
-      this.showCrashAlert(state.active_crash_alert);
-    }
-  }
-
-  showCrashAlert(alert) {
-    this._activeCrashAlert = alert;
-    if (!this.crashModalEl) return;
-
-    this.crashModalEl.classList.add('active');
-    if (this.crashImpactEl) this.crashImpactEl.textContent = `${alert.impact_g_force}g Peak Impact`;
-    if (this.crashLocEl) {
-      this.crashLocEl.innerHTML = `Locked DR Coordinates:<br><b>${alert.latitude.toFixed(6)}, ${alert.longitude.toFixed(6)}</b>`;
-    }
-
-    let countdown = 15; // 15s emergency window
-    if (this.crashCountdownEl) this.crashCountdownEl.textContent = `${countdown}s`;
-
-    if (this._crashCountdownTimer) clearInterval(this._crashCountdownTimer);
-    this._crashCountdownTimer = setInterval(() => {
-      countdown--;
-      if (this.crashCountdownEl) this.crashCountdownEl.textContent = `${countdown}s`;
-      if (countdown <= 0) {
-        clearInterval(this._crashCountdownTimer);
-        this.dispatchEmergencySos(alert);
+    if (this.diagSrcSpeedEl) {
+      if (this.currentMode === 'live') {
+        this.diagSrcSpeedEl.textContent = '15-State ES-EKF / ZUPT (SERVER_DERIVED)';
+      } else if (this.currentMode === 'replay') {
+        this.diagSrcSpeedEl.textContent = 'IO-VNBD Dataset Stream (REPLAY)';
+      } else {
+        this.diagSrcSpeedEl.textContent = 'Standby (DEFAULT)';
       }
-    }, 1000);
-
-    if (this.crashSosBtn) {
-      this.crashSosBtn.onclick = () => {
-        clearInterval(this._crashCountdownTimer);
-        this.dispatchEmergencySos(alert);
-      };
     }
 
-    if (this.crashCancelBtn) {
-      this.crashCancelBtn.onclick = () => {
-        clearInterval(this._crashCountdownTimer);
-        this.dismissCrashAlert();
-        if (window.app && window.app.client) {
-          window.app.client.cancelCrashAlert();
+    if (this.diagSrcHeadingEl) {
+      if (this.currentMode === 'live') {
+        const spd = Number(state.forward_speed_mps || 0.0);
+        if (spd < 0.5) {
+          this.diagSrcHeadingEl.textContent = 'Physical Device Compass (REAL_DEVICE)';
+        } else {
+          this.diagSrcHeadingEl.textContent = 'Dynamic GNSS COG / Gyro Fusion (SERVER_DERIVED)';
         }
-      };
+      } else if (this.currentMode === 'replay') {
+        this.diagSrcHeadingEl.textContent = 'IO-VNBD Dataset Yaw (REPLAY)';
+      } else {
+        this.diagSrcHeadingEl.textContent = 'Standby (DEFAULT)';
+      }
+    }
+
+    if (this.diagSrcTrajectoryEl) {
+      if (this.currentMode === 'live') {
+        this.diagSrcTrajectoryEl.textContent = state.is_in_blackout ? 'ES-EKF Dead Reckoning (SERVER_DERIVED)' : 'Live Geodetic GNSS Fixes (REAL_DEVICE)';
+      } else if (this.currentMode === 'replay') {
+        this.diagSrcTrajectoryEl.textContent = 'IO-VNBD Trajectory (REPLAY)';
+      } else {
+        this.diagSrcTrajectoryEl.textContent = 'Standby (DEFAULT)';
+      }
+    }
+
+    // 1. Primary Speed Display
+    const speedMps = Number(state.forward_speed_mps || 0.0);
+    const speedKmh = Math.round(speedMps * 3.6);
+    if (this.speedKmhEl) this.speedKmhEl.textContent = speedKmh;
+    if (this.speedMpsEl) this.speedMpsEl.textContent = `${speedMps.toFixed(1)} m/s`;
+
+    // 2. Heading & Compass
+    const headingDeg = Math.round(Number(state.heading_deg || 0));
+    const cardinals = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+    const cardIdx = Math.round(((headingDeg % 360) / 45)) % 8;
+    const cardinalStr = cardinals[cardIdx] || 'N';
+    if (this.headingDisplayEl) {
+      this.headingDisplayEl.textContent = `${String(headingDeg).padStart(3, '0')}° ${cardinalStr}`;
+    }
+
+    // 3. Lean Angle Visualizer
+    const leanDeg = Number(state.lean_angle_deg || 0.0);
+    const leanDir = leanDeg > 0.5 ? 'R' : leanDeg < -0.5 ? 'L' : '';
+    if (this.leanTextEl) {
+      this.leanTextEl.textContent = `${Math.abs(leanDeg).toFixed(1)}° ${leanDir}`;
+    }
+    if (this.leanMarkerEl) {
+      const clampedLean = Math.max(-45, Math.min(45, leanDeg));
+      const pct = 50 + (clampedLean / 45.0) * 50;
+      this.leanMarkerEl.style.left = `${pct}%`;
+    }
+    if (this.diagDynLeanEl) {
+      this.diagDynLeanEl.textContent = `${leanDeg.toFixed(1)}° (${leanDir || 'Level'})`;
+    }
+
+    // 4. Navigation Mode Pill
+    const isInBlackout = Boolean(state.is_in_blackout);
+    const navMode = String(state.nav_mode || (isInBlackout ? 'DEAD_RECKONING_NHC_AI' : 'GNSS_INS_FULL'));
+
+    if (this.modePillEl && this.modeTextEl) {
+      if (isInBlackout) {
+        this.modePillEl.className = 'nav-status-pill mode-dr';
+        this.modeTextEl.textContent = 'Dead Reckoning Active';
+      } else if (navMode.includes('REACQUISITION')) {
+        this.modePillEl.className = 'nav-status-pill mode-reacq';
+        this.modeTextEl.textContent = 'Reacquiring Position';
+      } else {
+        this.modePillEl.className = 'nav-status-pill mode-gnss';
+        this.modeTextEl.textContent = 'GNSS Active';
+      }
+    }
+
+    // 5. Outage & Recovery Toasts
+    const posUnc = Number(state.pos_uncertainty_m || 1.2);
+    if (posUnc > this.peakUncertainty) {
+      this.peakUncertainty = posUnc;
+    }
+
+    if (isInBlackout) {
+      if (!this.wasInBlackout) {
+        this.wasInBlackout = true;
+        this.blackoutStartTime = Date.now();
+        if (this.outageToastEl) this.outageToastEl.classList.remove('hidden');
+        if (this.recoveryToastEl) this.recoveryToastEl.classList.add('hidden');
+        if (this._recoveryTimeout) clearTimeout(this._recoveryTimeout);
+
+        if (this.blackoutElapsedTimer) clearInterval(this.blackoutElapsedTimer);
+        this.blackoutElapsedTimer = setInterval(() => {
+          if (this.outageTimerEl && this.blackoutStartTime) {
+            const elapsed = Math.floor((Date.now() - this.blackoutStartTime) / 1000);
+            const m = String(Math.floor(elapsed / 60)).padStart(2, '0');
+            const s = String(elapsed % 60).padStart(2, '0');
+            this.outageTimerEl.textContent = `${m}:${s}`;
+          }
+        }, 500);
+      }
+
+      if (this.outageUncEl) {
+        this.outageUncEl.textContent = `±${posUnc.toFixed(1)} m`;
+      }
+    } else {
+      if (this.wasInBlackout) {
+        this.wasInBlackout = false;
+        if (this.blackoutElapsedTimer) {
+          clearInterval(this.blackoutElapsedTimer);
+          this.blackoutElapsedTimer = null;
+        }
+        if (this.outageToastEl) this.outageToastEl.classList.add('hidden');
+        if (this.recoveryToastEl) {
+          this.recoveryToastEl.classList.remove('hidden');
+          this._recoveryTimeout = setTimeout(() => {
+            if (this.recoveryToastEl) this.recoveryToastEl.classList.add('hidden');
+          }, 3500);
+        }
+      }
+    }
+
+    // 6. Expanded Sheet Telemetry Values
+    const diag = state.diagnostics || {};
+    this.totalDrDistance = Number(diag.total_dr_distance_m || 0.0);
+    const trustPct = Math.round(Number(state.gnss_trust_score !== undefined ? state.gnss_trust_score : 1.0) * 100);
+    const aiSpd = Number(diag.ai_speed_mps || speedMps);
+
+    if (this.expValUncEl) this.expValUncEl.textContent = `±${posUnc.toFixed(1)} m`;
+    if (this.expValAiSpeedEl) this.expValAiSpeedEl.textContent = `${aiSpd.toFixed(1)} m/s`;
+    if (this.expValDrDistEl) this.expValDrDistEl.textContent = `${this.totalDrDistance.toFixed(0)} m`;
+    if (this.expValTrustEl) this.expValTrustEl.textContent = `${trustPct}%`;
+
+    // 7. Engineering Diagnostics Modal
+    if (this.diagLatLonEl && state.latitude && state.longitude) {
+      this.diagLatLonEl.textContent = `${Number(state.latitude).toFixed(5)}, ${Number(state.longitude).toFixed(5)}`;
+    }
+    if (this.diagSpeedFullEl) {
+      this.diagSpeedFullEl.textContent = `${speedKmh} km/h (${speedMps.toFixed(2)} m/s)`;
+    }
+    if (this.diagHeadingFullEl) {
+      this.diagHeadingFullEl.textContent = `${Number(state.heading_deg || 0).toFixed(1)}° (${cardinalStr})`;
+    }
+    if (this.diagDrDistEl) {
+      this.diagDrDistEl.textContent = `${this.totalDrDistance.toFixed(1)} m`;
+    }
+    if (this.diagGnssStateEl) {
+      this.diagGnssStateEl.textContent = state.gnss_status || (isInBlackout ? 'DENIED / OUTAGE' : 'TRUSTED');
+    }
+    if (this.diagTrustScoreEl) {
+      this.diagTrustScoreEl.textContent = `${trustPct}%`;
+    }
+    if (this.diagAiSpeedEl) {
+      this.diagAiSpeedEl.textContent = `${aiSpd.toFixed(2)} m/s (${(aiSpd * 3.6).toFixed(1)} km/h)`;
+    }
+    if (this.diagPosUncEl) {
+      this.diagPosUncEl.textContent = `±${posUnc.toFixed(2)} m`;
+    }
+    if (this.diagHeadingUncEl) {
+      this.diagHeadingUncEl.textContent = `±${Number(diag.heading_uncertainty_deg || 1.5).toFixed(1)}°`;
+    }
+
+    // 8. Crash Alert / SOS State (USP 4)
+    if (state.active_crash_alert) {
+      const alert = state.active_crash_alert;
+      if (this.crashToastEl) this.crashToastEl.classList.remove('hidden');
+      if (this.crashAlertDetailsEl) {
+        this.crashAlertDetailsEl.textContent = `${alert.vehicle_type ? alert.vehicle_type.toUpperCase() : 'VEHICLE'} · Peak Impact ${alert.impact_g_force}g · Stillness Confirmed`;
+      }
+      if (this.diagCrashStatusEl) {
+        this.diagCrashStatusEl.textContent = 'ALERT ACTIVE (CONFIRMED)';
+        this.diagCrashStatusEl.className = 'field-value highlight-amber';
+      }
+    } else {
+      if (this.crashToastEl) this.crashToastEl.classList.add('hidden');
+      if (this.diagCrashStatusEl) {
+        this.diagCrashStatusEl.textContent = 'MONITORING';
+        this.diagCrashStatusEl.className = 'field-value status-active';
+      }
     }
   }
 
-  dispatchEmergencySos(alert) {
-    const text = encodeURIComponent(alert.emergency_message || 'Emergency crash detected! Location: ' + alert.google_maps_url);
-    const whatsappUrl = `https://api.whatsapp.com/send?text=${text}`;
-    window.open(whatsappUrl, '_blank');
-    alert('SOS Payload Dispatched to Emergency Contacts!\n\n' + (alert.emergency_message || ''));
-    this.dismissCrashAlert();
+  setMode(mode, label = '') {
+    this.currentMode = mode;
+    this.modeLabel = label;
+    this._refreshModal();
   }
 
-  dismissCrashAlert() {
-    this._activeCrashAlert = null;
-    if (this._crashCountdownTimer) clearInterval(this._crashCountdownTimer);
-    if (this.crashModalEl) this.crashModalEl.classList.remove('active');
+  updateHardwareTelemetry(telem) {
+    if (!telem) return;
+    this.lastTelem = telem;
+
+    if (this.diagHwAccelEl) {
+      if (telem.accel && telem.accel.hasData) {
+        const hz = telem.accel.rateHz > 0 ? telem.accel.rateHz : (telem.accel.count > 0 ? telem.accel.count : 50);
+        const r = telem.accel.raw || [0, 0, 9.81];
+        this.diagHwAccelEl.textContent = `● Active (${hz} Hz) [${r[0].toFixed(1)}, ${r[1].toFixed(1)}, ${r[2].toFixed(1)}]`;
+        this.diagHwAccelEl.style.color = 'var(--status-emerald)';
+      } else if (!telem.isSecureContext) {
+        this.diagHwAccelEl.textContent = 'Insecure HTTP Context';
+        this.diagHwAccelEl.style.color = 'var(--status-amber)';
+      } else if (telem.accel && telem.accel.status === 'SEARCHING') {
+        this.diagHwAccelEl.textContent = '○ Searching...';
+        this.diagHwAccelEl.style.color = 'var(--text-muted)';
+      } else if (telem.accel && telem.accel.status === 'PERMISSION_DENIED') {
+        this.diagHwAccelEl.textContent = '✕ Permission Denied';
+        this.diagHwAccelEl.style.color = 'var(--status-rose)';
+      } else {
+        this.diagHwAccelEl.textContent = '○ Standby';
+        this.diagHwAccelEl.style.color = 'var(--text-muted)';
+      }
+    }
+
+    if (this.diagHwGyroEl) {
+      if (telem.gyro && telem.gyro.hasData) {
+        const hz = telem.gyro.rateHz > 0 ? telem.gyro.rateHz : (telem.gyro.count > 0 ? telem.gyro.count : 50);
+        const r = telem.gyro.raw || [0, 0, 0];
+        this.diagHwGyroEl.textContent = `● Active (${hz} Hz) [${r[0].toFixed(2)}, ${r[1].toFixed(2)}, ${r[2].toFixed(2)}]`;
+        this.diagHwGyroEl.style.color = 'var(--status-emerald)';
+      } else if (!telem.isSecureContext) {
+        this.diagHwGyroEl.textContent = 'Insecure HTTP Context';
+        this.diagHwGyroEl.style.color = 'var(--status-amber)';
+      } else if (telem.gyro && telem.gyro.status === 'SEARCHING') {
+        this.diagHwGyroEl.textContent = '○ Searching...';
+        this.diagHwGyroEl.style.color = 'var(--text-muted)';
+      } else if (telem.gyro && telem.gyro.status === 'PERMISSION_DENIED') {
+        this.diagHwGyroEl.textContent = '✕ Permission Denied';
+        this.diagHwGyroEl.style.color = 'var(--status-rose)';
+      } else {
+        this.diagHwGyroEl.textContent = '○ Standby';
+        this.diagHwGyroEl.style.color = 'var(--text-muted)';
+      }
+    }
+
+    if (this.diagHwOriEl) {
+      if (telem.orientation && telem.orientation.hasData) {
+        const hz = telem.orientation.rateHz > 0 ? telem.orientation.rateHz : (telem.orientation.count > 0 ? telem.orientation.count : 50);
+        const r = telem.orientation.raw || [0, 0, 0];
+        const headingVal = Math.round(r[0]);
+        const alphaStr = telem.orientation.rawAlpha !== undefined && telem.orientation.rawAlpha !== null ? ` (α: ${Math.round(telem.orientation.rawAlpha)}°)` : '';
+        const absStr = telem.orientation.isAbsolute ? ' [Abs]' : '';
+        this.diagHwOriEl.textContent = `● Active (${hz} Hz) [${String(headingVal).padStart(3, '0')}°${alphaStr}${absStr}]`;
+        this.diagHwOriEl.style.color = 'var(--status-emerald)';
+      } else if (!telem.isSecureContext) {
+        this.diagHwOriEl.textContent = 'Insecure HTTP Context';
+        this.diagHwOriEl.style.color = 'var(--status-amber)';
+      } else if (telem.orientation && telem.orientation.status === 'SEARCHING') {
+        this.diagHwOriEl.textContent = '○ Searching...';
+        this.diagHwOriEl.style.color = 'var(--text-muted)';
+      } else {
+        this.diagHwOriEl.textContent = '○ Standby';
+        this.diagHwOriEl.style.color = 'var(--text-muted)';
+      }
+    }
+
+    if (this.diagHwGpsEl) {
+      if (telem.gnss && (telem.gnss.status === 'FIX' || telem.gnss.hasData)) {
+        const acc = telem.gnss.accuracy_m ? `±${Math.round(telem.gnss.accuracy_m)}m` : '±3m';
+        this.diagHwGpsEl.textContent = `● Fix Acquired (${acc})`;
+        this.diagHwGpsEl.style.color = 'var(--status-emerald)';
+      } else if (telem.gnss && telem.gnss.status === 'PERMISSION_DENIED') {
+        this.diagHwGpsEl.textContent = '✕ Permission Denied';
+        this.diagHwGpsEl.style.color = 'var(--status-rose)';
+      } else if (telem.gnss && telem.gnss.status === 'TIMEOUT') {
+        this.diagHwGpsEl.textContent = '⚠ Weak Signal / Timeout';
+        this.diagHwGpsEl.style.color = 'var(--status-amber)';
+      } else if (telem.gnss && telem.gnss.status === 'SEARCHING') {
+        this.diagHwGpsEl.textContent = '○ Searching GPS Fix...';
+        this.diagHwGpsEl.style.color = 'var(--text-muted)';
+      } else if (!telem.isSecureContext) {
+        this.diagHwGpsEl.textContent = 'Insecure HTTP Context';
+        this.diagHwGpsEl.style.color = 'var(--status-amber)';
+      } else {
+        this.diagHwGpsEl.textContent = '○ Standby';
+        this.diagHwGpsEl.style.color = 'var(--text-muted)';
+      }
+    }
+  }
+
+  _refreshModal() {
+    if (this.lastState) {
+      this.update(this.lastState);
+    }
+    if (this.lastTelem) {
+      this.updateHardwareTelemetry(this.lastTelem);
+    }
+  }
+
+  showDiagnosticsModal() {
+    this._refreshModal();
+    if (this.diagModalEl) this.diagModalEl.classList.add('active');
+  }
+
+  hideDiagnosticsModal() {
+    if (this.diagModalEl) this.diagModalEl.classList.remove('active');
+  }
+
+  showSummaryModal(summaryData) {
+    if (!this.summaryModalEl) return;
+
+    const elapsedTotal = Math.floor((Date.now() - this.navigationStartTime) / 1000);
+    const m = String(Math.floor(elapsedTotal / 60)).padStart(2, '0');
+    const s = String(elapsedTotal % 60).padStart(2, '0');
+
+    if (this.sumDurationEl) this.sumDurationEl.textContent = `${m}:${s}`;
+
+    if (summaryData) {
+      if (this.sumTotalDistEl) this.sumTotalDistEl.textContent = `${Number(summaryData.total_distance_km || 0.0).toFixed(2)} km`;
+      if (this.sumDrDistEl) this.sumDrDistEl.textContent = `${Number(summaryData.total_dr_distance_m || 0.0).toFixed(1)} m`;
+      if (this.sumVehTypeEl) this.sumVehTypeEl.textContent = summaryData.vehicle_type === 'two_wheeler' ? 'Two-Wheeler' : 'Four-Wheeler';
+      if (this.sumOutageTimeEl) this.sumOutageTimeEl.textContent = `${Number(summaryData.current_outage_sec || 0.0).toFixed(1)} s`;
+      if (this.sumPeakUncEl) this.sumPeakUncEl.textContent = `±${Number(summaryData.pos_uncertainty_1sigma_m || this.peakUncertainty).toFixed(1)} m`;
+      if (this.sumAiRateEl) this.sumAiRateEl.textContent = `${summaryData.ai_acceptance_rate_pct || 100}%`;
+      if (this.sumBlackspotsEl) this.sumBlackspotsEl.textContent = `${summaryData.blackspots_detected || 0}`;
+    }
+
+    this.summaryModalEl.classList.add('active');
+  }
+
+  hideSummaryModal() {
+    if (this.summaryModalEl) this.summaryModalEl.classList.remove('active');
   }
 }
 

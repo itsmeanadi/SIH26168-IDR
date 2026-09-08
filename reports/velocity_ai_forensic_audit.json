@@ -1,0 +1,188 @@
+{
+  "audit_milestone": "FORENSIC EVALUATION AUDIT — VELOCITY ESTIMATION",
+  "project": "SIH 2026 Problem Statement 26168 (AI-ML Intelligent Dead Reckoning)",
+  "audit_timestamp_utc": "2026-09-08T02:09:30Z",
+  "git_commit_head": "450d8e53c2b514de6020a29ac3803c0067daf9a1",
+  "dataset_metadata": {
+    "name": "authentic-iovnbd",
+    "preprocessing_manifest": "2.1.0_authentic_synchronized",
+    "split_policy": "driver_disjoint",
+    "train_windows": 88218,
+    "val_windows": 10581,
+    "test_windows": 7012,
+    "held_out_test_driver": "Driver D (Drive Y1)",
+    "window_size_samples": 50,
+    "stride_samples": 10,
+    "features": ["acc_x", "acc_y", "acc_z", "gyro_x", "gyro_y", "gyro_z"],
+    "target": "vehicle_ecu_can_forward_speed_mps"
+  },
+  "model_verification": {
+    "checkpoint_path": "models/authentic/velocity_net.pt",
+    "checkpoint_size_bytes": 331723,
+    "best_epoch": 6,
+    "best_val_huber_loss": 1.737754273500236,
+    "total_parameters": 79394,
+    "trainable_parameters": 79394,
+    "architecture": "3-layer Dilated Conv1D (d=1,2,4, c=64) + 2-layer GRU (h=64) + Dual Head (Regressor + Stationary Gate)"
+  },
+  "feature_scaling_investigation": {
+    "train_scaler_json_created": true,
+    "train_scaler_json_loaded_during_training": false,
+    "applied_to_npz_arrays": false,
+    "npz_arrays_representation": "physical_unscaled_si_units",
+    "normalization_mechanism": "Internal learnable BatchNorm1d layers in 1D temporal convolutional backbone",
+    "channel_ranges_test": {
+      "acc_x": [-35.619, 7.4589],
+      "acc_y": [-10.0653, 17.4006],
+      "acc_z": [-17.1479, 17.0127],
+      "gyro_x": [-3.9086, 12.8719],
+      "gyro_y": [-10.8728, 13.9119],
+      "gyro_z": [-9.7277, 3.6466]
+    }
+  },
+  "persistence_baseline_forensic_classification": {
+    "evaluated_definition": "y_pred[t] = y_gt[t-1] (Vehicle CAN speed from prior 1-second step)",
+    "classification": "INVALID PRIVILEGED-INFORMATION BASELINE",
+    "scientific_status": "Oracle Reference / Upper-Bound on Target Autocorrelation Only (Non-Deployable)",
+    "reason": "Vehicle CAN forward speed is physically unobservable on a smartphone during a GNSS blackout without CAN-bus hardware integration."
+  },
+  "ai_metrics_independent_reproduction": {
+    "mae_mps": 2.5666894912719727,
+    "rmse_mps": 3.4462764263153076,
+    "max_abs_error_mps": 16.480445861816406,
+    "median_abs_error_mps": 2.0279479026794434,
+    "p90_abs_error_mps": 5.615166664123535,
+    "p95_abs_error_mps": 6.89850378036499,
+    "p99_abs_error_mps": 10.417529106140137,
+    "mean_signed_bias_mps": -0.45487797260284424,
+    "pearson_correlation": 0.7728268870633087,
+    "r_squared": 0.5767557621002197,
+    "reported_vs_recomputed_discrepancy": 0.0
+  },
+  "speed_regime_breakdown": {
+    "Stationary (< 0.5 m/s)": {
+      "count": 904,
+      "share_percent": 12.892184826012551,
+      "mae_mps": 1.3104957342147827,
+      "rmse_mps": 3.240297555923462,
+      "median_abs_mps": 0.13797920942306519,
+      "max_err_mps": 16.480445861816406,
+      "bias_mps": 1.2865263223648071
+    },
+    "Low Speed (0.5 - 5.0 m/s)": {
+      "count": 1039,
+      "share_percent": 14.817455790074158,
+      "mae_mps": 2.4736196994781494,
+      "rmse_mps": 3.2937088012695312,
+      "median_abs_mps": 1.8103703260421753,
+      "max_err_mps": 10.427460670471191,
+      "bias_mps": 0.8599145412445068
+    },
+    "Medium Speed (5.0 - 15.0 m/s)": {
+      "count": 4404,
+      "share_percent": 62.806617227609806,
+      "mae_mps": 2.4268991947174072,
+      "rmse_mps": 2.9868545532226562,
+      "median_abs_mps": 2.1074228286743164,
+      "max_err_mps": 12.938678741455078,
+      "bias_mps": -0.39488697052001953
+    },
+    "High Speed (>= 15.0 m/s)": {
+      "count": 665,
+      "share_percent": 9.48374215630348,
+      "mae_mps": 5.345537185668945,
+      "rmse_mps": 5.910062313079834,
+      "median_abs_mps": 5.1122026443481445,
+      "max_err_mps": 13.73173713684082,
+      "bias_mps": -5.273673057556152
+    },
+    "total_regime_windows": 7012
+  },
+  "comparative_baselines": {
+    "AI_VelocityEstimatorNet": {
+      "deployable": true,
+      "mae_mps": 2.566689,
+      "rmse_mps": 3.446276,
+      "median_mps": 2.027948,
+      "p90_mps": 5.615167,
+      "p95_mps": 6.898504,
+      "p99_mps": 10.417529,
+      "bias_mps": -0.454878,
+      "corr": 0.772827,
+      "r2": 0.576756
+    },
+    "Oracle_Target_Persistence_1s": {
+      "deployable": false,
+      "privileged": true,
+      "mae_mps": 0.501278,
+      "rmse_mps": 0.855760,
+      "median_mps": 0.300300,
+      "p90_mps": 1.231200,
+      "p95_mps": 1.556400,
+      "p99_mps": 2.332700,
+      "bias_mps": 0.000700,
+      "corr": 0.986950,
+      "r2": 0.973903
+    },
+    "Training_Median_Baseline": {
+      "deployable": true,
+      "mae_mps": 5.254830,
+      "rmse_mps": 6.550993,
+      "median_mps": 4.510500,
+      "p90_mps": 12.160100,
+      "p95_mps": 12.183500,
+      "p99_mps": 12.191400,
+      "bias_mps": 3.854100,
+      "corr": 0.0,
+      "r2": -0.529344
+    },
+    "Training_Mean_Baseline": {
+      "deployable": true,
+      "mae_mps": 5.814926,
+      "rmse_mps": 7.190627,
+      "median_mps": 5.026000,
+      "p90_mps": 13.168400,
+      "p95_mps": 13.191900,
+      "p99_mps": 13.199800,
+      "bias_mps": 4.862500,
+      "corr": 0.0,
+      "r2": -0.842571
+    },
+    "Zero_Velocity_Predictor": {
+      "deployable": true,
+      "mae_mps": 8.346583,
+      "rmse_mps": 9.885689,
+      "median_mps": 8.597700,
+      "p90_mps": 14.716300,
+      "p95_mps": 17.479800,
+      "p99_mps": 19.328800,
+      "bias_mps": -8.346583,
+      "corr": 0.0,
+      "r2": -2.482609
+    },
+    "Kinematic_IMU_Integration": {
+      "deployable": true,
+      "mae_mps": 8.161700,
+      "rmse_mps": 9.699300,
+      "median_mps": 8.422800,
+      "p90_mps": 14.548200,
+      "p95_mps": 17.265200,
+      "p99_mps": 19.272500,
+      "bias_mps": -8.135900,
+      "corr": 0.079600,
+      "r2": -2.352500
+    }
+  },
+  "host_cpu_inference_benchmark": {
+    "platform": "Windows-11-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 186 Stepping 2, GenuineIntel (10 threads)",
+    "python_version": "3.14.3",
+    "pytorch_version": "2.14.0+cpu",
+    "mean_latency_ms": 4.067,
+    "median_latency_ms": 4.034,
+    "p95_latency_ms": 5.548,
+    "p99_latency_ms": 6.286,
+    "throughput_windows_per_sec": 245.9
+  },
+  "scientific_verdict": "EVALUATION VALID — AI CONDITIONALLY READY FOR NEXT SCIENTIFIC EXPERIMENT"
+}

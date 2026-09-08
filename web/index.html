@@ -3,288 +3,726 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>IDR — AI-ML Intelligent Dead Reckoning System</title>
-  <meta name="description" content="AI-ML Intelligent Dead Reckoning for Two-Wheelers and Cars (SIH PS 26168)">
+  <title>IDR Navigation — Intelligent Dead Reckoning</title>
+  <meta name="description" content="Intelligent Dead Reckoning for Two-Wheelers and Four-Wheelers in GNSS-Denied Environments">
   <link rel="manifest" href="/manifest.json">
-  <meta name="theme-color" content="#0ea5e9">
+  <meta name="theme-color" content="#080c14">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
   <link rel="stylesheet" href="/css/app.css">
 </head>
 <body>
 
-  <!-- App Header -->
-  <header class="app-header">
-    <div class="brand-title">
-      <span>🚀 IDR NAVIGATION</span>
-      <span class="brand-badge">SIH 26168</span>
+  <!-- App Header / Minimal Top Bar (Hidden on Fullscreen Navigation) -->
+  <header id="app-header" class="app-header">
+    <div class="brand-container" id="btn-header-home" role="button" title="IDR Home">
+      <div class="brand-mark">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="3 11 22 2 13 21 11 13 3 11"/>
+        </svg>
+      </div>
+      <div class="brand-meta">
+        <span class="brand-title">IDR Navigation</span>
+        <span class="brand-tag">PS 26168</span>
+      </div>
     </div>
 
-    <div class="header-controls">
-      <!-- Input Source Indicator (Live Phone vs Replay Simulation) -->
-      <span id="data-source-badge" style="font-size: 0.7rem; font-weight: 700; padding: 4px 8px; border-radius: 4px; background: rgba(148, 163, 184, 0.15); border: 1px solid var(--bg-card-border); color: var(--text-secondary);">
-        SOURCE: ⏸️ STANDBY
-      </span>
-
-      <button id="btn-profile-bike" class="btn-profile active" title="Switch to Two-Wheeler Lean Dynamics">
-        🛵 Two-Wheeler
-      </button>
-      <button id="btn-profile-car" class="btn-profile" title="Switch to Car Dynamics">
-        🚗 Car
-      </button>
-      <div style="display: flex; align-items: center; gap: 6px; margin-left: 6px; font-size: 0.75rem; color: var(--text-secondary);">
-        <span id="connection-status-dot" class="status-dot pulsing"></span>
-        <span id="connection-status-text">WS CONNECTED</span>
+    <!-- Mode / Connection Status Pill -->
+    <div class="header-right">
+      <div id="provenance-pill" class="status-pill standby">
+        <span class="status-indicator"></span>
+        <span id="provenance-text">Standby</span>
       </div>
+
+      <button id="btn-header-diag" class="btn-subtle-icon" title="Engineering Diagnostics">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="4" y1="21" x2="4" y2="14"></line>
+          <line x1="4" y1="10" x2="4" y2="3"></line>
+          <line x1="12" y1="21" x2="12" y2="12"></line>
+          <line x1="12" y1="8" x2="12" y2="3"></line>
+          <line x1="20" y1="21" x2="20" y2="16"></line>
+          <line x1="20" y1="12" x2="20" y2="3"></line>
+          <line x1="1" y1="14" x2="7" y2="14"></line>
+          <line x1="9" y1="8" x2="15" y2="8"></line>
+          <line x1="17" y1="16" x2="23" y2="16"></line>
+        </svg>
+      </button>
     </div>
   </header>
 
-  <!-- Main Cockpit Layout -->
-  <main class="main-container">
-
-    <!-- Left Column: Primary Telemetry & Cockpit HUD -->
-    <section class="card" style="display: flex; flex-direction: column; gap: 12px;">
-      <div class="card-header">
-        <span class="card-title">⚡ Real-Time Cockpit</span>
-        <span id="nav-mode-pill" class="nav-mode-badge mode-gnss">GNSS+INS FULL</span>
+  <!-- ═════════════════════════════════════════════════════════════════════════ -->
+  <!-- SCREEN 1: HOME SCREEN (Application Launchpad)                            -->
+  <!-- ═════════════════════════════════════════════════════════════════════════ -->
+  <section id="screen-home" class="app-screen active">
+    <div class="home-layout">
+      
+      <!-- Hero Product Statement -->
+      <div class="home-hero">
+        <h1 class="hero-headline">CONTINUOUS NAVIGATION<br>WHEN GNSS DISAPPEARS.</h1>
+        <p class="hero-subtext">
+          Dead reckoning navigation powered by smartphone inertial sensing, neural velocity estimation, and 15-state error-state Kalman filtering.
+        </p>
       </div>
 
-      <div class="telemetry-grid">
-        <div class="gauge-box">
-          <div id="val-speed" class="gauge-val">0.0</div>
-          <div class="gauge-unit">m/s</div>
-          <div id="val-speed-kmh" class="gauge-label">0.0 km/h</div>
-        </div>
+      <!-- Primary Action Stack -->
+      <div class="action-stack">
+        <button id="btn-home-start-live" class="btn btn-primary btn-large">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="5 3 19 12 5 21 5 3"/>
+          </svg>
+          <span>Start Navigation</span>
+        </button>
 
-        <div class="gauge-box">
-          <div id="val-heading" class="gauge-val">0°</div>
-          <div class="gauge-unit">HEADING</div>
-          <div class="gauge-label">COMPASS ENU</div>
-        </div>
+        <button id="btn-home-start-replay" class="btn btn-secondary btn-large">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polygon points="10 8 16 12 10 16 10 8"></polygon>
+          </svg>
+          <span>Replay Demonstration</span>
+        </button>
+      </div>
 
-        <div class="gauge-box" style="grid-column: span 2;">
-          <div class="card-title" style="justify-content: space-between; margin-bottom: 4px;">
-            <span>🏍️ Two-Wheeler Lean Angle</span>
-            <span id="val-lean" style="font-family: monospace; font-size: 0.85rem; color: var(--cyan-accent);">0.0°</span>
-          </div>
-          <div class="lean-visualizer">
-            <div class="lean-horizon"></div>
-            <div id="lean-bike-icon" class="bike-icon">🏍️</div>
-          </div>
+      <!-- Vehicle Profile Selector -->
+      <div class="section-container">
+        <div class="section-label">Vehicle Dynamics</div>
+        <div class="segmented-control">
+          <button id="btn-home-profile-bike" class="segment-btn active">
+            <svg class="segment-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="5.5" cy="17.5" r="3.5"></circle>
+              <circle cx="18.5" cy="17.5" r="3.5"></circle>
+              <path d="M15 6a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm-3 11.5L9 9l3-3 3 4.5h4"></path>
+            </svg>
+            <span>Two-Wheeler</span>
+          </button>
+          <button id="btn-home-profile-car" class="segment-btn">
+            <svg class="segment-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="5" width="20" height="14" rx="3"></rect>
+              <circle cx="7" cy="17" r="2"></circle>
+              <circle cx="17" cy="17" r="2"></circle>
+              <path d="M5 10h14"></path>
+            </svg>
+            <span>Four-Wheeler</span>
+          </button>
         </div>
       </div>
 
-      <!-- Live Mobile Sensor Ingestion Button -->
-      <button id="btn-toggle-sensors" class="btn btn-block" style="margin-top: 4px;">
-        📱 Start Live Phone IMU+GNSS
+      <!-- Demonstration Drive Scenarios -->
+      <div class="section-container">
+        <div class="section-label">Demo Scenarios</div>
+        <div class="scenario-grid">
+          <button class="scenario-chip active" data-drive="Vf">
+            <span class="chip-title">Vf — Motorway</span>
+            <span class="chip-desc">High Speed Cruise (100+ km/h)</span>
+          </button>
+          <button class="scenario-chip" data-drive="M">
+            <span class="chip-title">M — Urban</span>
+            <span class="chip-desc">Roundabouts & Sharp Turns</span>
+          </button>
+          <button class="scenario-chip" data-drive="S">
+            <span class="chip-title">S — Curved Roads</span>
+            <span class="chip-desc">Continuous Motorcycle Lean</span>
+          </button>
+          <button class="scenario-chip" data-drive="Y1">
+            <span class="chip-title">Y1 — Held-Out Test</span>
+            <span class="chip-desc">Unseen Track Evaluation</span>
+          </button>
+          <button class="scenario-chip" data-drive="Synthetic Benchmark">
+            <span class="chip-title">Synthetic — Tunnel</span>
+            <span class="chip-desc">30s Outage Benchmark</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- System Readiness & Subsystem Semantics -->
+      <div class="system-status-panel">
+        <div class="status-grid">
+          <div class="status-cell">
+            <span class="status-cell-title">Engine</span>
+            <div class="status-cell-val" id="stat-engine-state">
+              <span class="beacon-mini emerald"></span>
+              <span>Online</span>
+            </div>
+          </div>
+          <div class="status-cell">
+            <span class="status-cell-title">Live Sensors</span>
+            <div class="status-cell-val" id="stat-sensors-state">
+              <span class="beacon-mini gray"></span>
+              <span>Not Active</span>
+            </div>
+          </div>
+          <div class="status-cell">
+            <span class="status-cell-title">Replay</span>
+            <div class="status-cell-val" id="stat-replay-state">
+              <span class="beacon-mini emerald"></span>
+              <span>Ready</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="system-status-links">
+          <button id="btn-home-diag-link" class="link-action">Diagnostics</button>
+          <span class="link-sep">•</span>
+          <button id="btn-home-sensor-guide" class="link-action">Sensor Setup Guide</button>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ═════════════════════════════════════════════════════════════════════════ -->
+  <!-- SCREEN 2: NAVIGATION SCREEN (Edge-to-Edge Map & Floating HUD)            -->
+  <!-- ═════════════════════════════════════════════════════════════════════════ -->
+  <section id="screen-nav" class="app-screen">
+    
+    <!-- Fullscreen Map Canvas -->
+    <div id="map" class="nav-map-canvas"></div>
+
+    <!-- Top Floating Navigation Controls -->
+    <div class="nav-floating-top">
+      <button id="btn-nav-back-home" class="btn-nav-glass" title="Exit Navigation">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="19" y1="12" x2="5" y2="12"></line>
+          <polyline points="12 19 5 12 12 5"></polyline>
+        </svg>
+        <span>Exit</span>
       </button>
 
-      <!-- Live Phone Hardware Sensor Matrix -->
-      <div style="background: rgba(0,0,0,0.35); border: 1px solid var(--bg-card-border); border-radius: var(--radius-md); padding: 8px 10px; margin-top: 6px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-          <span style="font-size: 0.68rem; font-weight: 800; color: var(--text-secondary); text-transform: uppercase;">📡 Phone Sensor Hardware Matrix</span>
-          <span id="hw-secure-badge" style="font-size: 0.6rem; font-weight: 700; color: var(--emerald-accent);">SECURE CTX</span>
-        </div>
-
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 0.72rem;">
-          <!-- Accel -->
-          <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); padding: 4px 6px; border-radius: 4px;">
-            <span>ACCEL:</span>
-            <span id="hw-accel-status" style="font-family: monospace; font-weight: 700; color: var(--text-muted);">○ NO DATA</span>
-          </div>
-          <!-- Gyro -->
-          <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); padding: 4px 6px; border-radius: 4px;">
-            <span>GYRO:</span>
-            <span id="hw-gyro-status" style="font-family: monospace; font-weight: 700; color: var(--text-muted);">○ NO DATA</span>
-          </div>
-          <!-- Orientation -->
-          <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); padding: 4px 6px; border-radius: 4px;">
-            <span>COMPASS:</span>
-            <span id="hw-ori-status" style="font-family: monospace; font-weight: 700; color: var(--text-muted);">○ NO DATA</span>
-          </div>
-          <!-- GNSS -->
-          <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); padding: 4px 6px; border-radius: 4px;">
-            <span>GNSS:</span>
-            <span id="hw-gnss-status" style="font-family: monospace; font-weight: 700; color: var(--text-muted);">○ NO FIX</span>
-          </div>
-        </div>
+      <!-- Center Status Pill -->
+      <div id="nav-mode-pill" class="nav-status-pill mode-gnss">
+        <span class="status-beacon"></span>
+        <span id="nav-mode-text">GNSS Active</span>
       </div>
 
-      <!-- Field Telemetry Recorder Card -->
-      <div style="background: rgba(0,0,0,0.4); border: 1px solid rgba(0, 242, 254, 0.4); border-radius: var(--radius-md); padding: 8px 10px; margin-top: 6px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-          <span style="font-size: 0.68rem; font-weight: 800; color: var(--cyan-accent); text-transform: uppercase;">⏺️ Field Telemetry Recorder</span>
-          <span id="rec-status-badge" style="font-size: 0.6rem; font-weight: 700; color: var(--text-muted); background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px;">IDLE</span>
-        </div>
+      <button id="btn-nav-telemetry" class="btn-nav-glass" title="Engineering Diagnostics">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="4" y1="21" x2="4" y2="14"></line>
+          <line x1="4" y1="10" x2="4" y2="3"></line>
+          <line x1="12" y1="21" x2="12" y2="12"></line>
+          <line x1="12" y1="8" x2="12" y2="3"></line>
+          <line x1="20" y1="21" x2="20" y2="16"></line>
+          <line x1="20" y1="12" x2="20" y2="3"></line>
+          <line x1="1" y1="14" x2="7" y2="14"></line>
+          <line x1="9" y1="8" x2="15" y2="8"></line>
+          <line x1="17" y1="16" x2="23" y2="16"></line>
+        </svg>
+      </button>
+    </div>
 
-        <div style="display: flex; gap: 6px; align-items: center; margin-bottom: 6px;">
-          <button id="btn-toggle-recording" class="btn" style="flex: 1; padding: 6px; font-size: 0.72rem; background: var(--bg-card); border: 1px solid var(--rose-accent); color: var(--rose-accent);">
-            🔴 Start Recording
-          </button>
-          <span id="rec-timer-badge" style="font-family: monospace; font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); min-width: 50px; text-align: right;">00:00</span>
-        </div>
-
-        <div id="rec-marker-bar" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; font-size: 0.65rem;">
-          <button class="btn btn-marker" data-label="BRAKING" style="padding: 3px 2px; font-size: 0.62rem; background: rgba(255,255,255,0.05);">🛑 Brake</button>
-          <button class="btn btn-marker" data-label="TURN" style="padding: 3px 2px; font-size: 0.62rem; background: rgba(255,255,255,0.05);">↩️ Turn</button>
-          <button class="btn btn-marker" data-label="POTHOLE" style="padding: 3px 2px; font-size: 0.62rem; background: rgba(255,255,255,0.05);">⚠️ Bump</button>
-          <button class="btn btn-marker" data-label="OUTAGE_TEST" style="padding: 3px 2px; font-size: 0.62rem; background: rgba(255,255,255,0.05);">🚇 Tunnel</button>
-        </div>
-      </div>
-
-      <!-- Four USPs Quick Bar -->
-      <div class="usp-bar" style="margin-top: 6px;">
-        <!-- USP 1 -->
-        <div class="usp-pill">
-          <div class="usp-pill-title">USP 1: GNSS Trust</div>
-          <div class="usp-pill-val">
-            <span id="val-trust-score" style="color: var(--emerald-accent);">100%</span>
-            <span id="val-gnss-status" style="font-size: 0.7rem; color: var(--text-muted);">TRUSTED</span>
-          </div>
-          <div class="progress-bar-bg">
-            <div id="bar-trust" class="progress-bar-fill" style="width: 100%;"></div>
-          </div>
-        </div>
-
-        <!-- USP 3 -->
-        <div class="usp-pill">
-          <div class="usp-pill-title">USP 3: Blackspots</div>
-          <div class="usp-pill-val">
-            <span id="val-blackspot-count" style="color: var(--purple-accent);">0</span>
-            <span style="font-size: 0.7rem; color: var(--text-muted);">DETECTED</span>
-          </div>
-          <div style="font-size: 0.65rem; color: var(--text-muted); margin-top: 4px;">Auto-Logged Zones</div>
+    <!-- Crash SOS Alert Banner (USP 4) -->
+    <div id="crash-toast" class="crash-toast hidden">
+      <div class="crash-bar"></div>
+      <div class="crash-content">
+        <div class="crash-headline">EMERGENCY SOS · CRASH DETECTED</div>
+        <div class="crash-details" id="crash-alert-details">
+          Impact: 4.8g · Coordinates Locked · Dispatching Emergency Payload
         </div>
       </div>
-    </section>
+      <button id="btn-cancel-crash" class="btn-crash-cancel">Cancel SOS</button>
+    </div>
 
-    <!-- Center Column: Leaflet Live Navigation Map -->
-    <section class="card map-card">
-      <div id="map"></div>
+    <!-- Restrained Outage Notification Toast (Non-Obtrusive) -->
+    <div id="outage-toast" class="outage-toast hidden">
+      <div class="toast-bar"></div>
+      <div class="toast-content">
+        <div class="toast-headline">GNSS LOST · DEAD RECKONING</div>
+        <div class="toast-details">
+          <span>Continuing with inertial navigation</span>
+          <span class="dot-sep">•</span>
+          <span>Outage: <b id="val-outage-timer">00:00</b></span>
+          <span class="dot-sep">•</span>
+          <span>Confidence: <b id="val-outage-unc">±1.2 m</b></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recovery Notification Toast -->
+    <div id="recovery-toast" class="recovery-toast hidden">
+      <div class="toast-bar"></div>
+      <div class="toast-content">
+        <div class="toast-headline">GNSS RESTORED</div>
+        <div class="toast-details">Position re-acquired · Trajectory converged</div>
+      </div>
+    </div>
+
+    <!-- ═════════════════════════════════════════════════════════════════════════ -->
+    <!-- FLOATING BOTTOM SHEET (Hero Navigation Cockpit & Expandable Telemetry)     -->
+    <!-- ═════════════════════════════════════════════════════════════════════════ -->
+    <div id="nav-bottom-sheet" class="bottom-sheet collapsed">
       
-      <!-- Overlay Map Controls -->
-      <div class="map-overlay-controls">
-        <button id="btn-map-center" class="map-btn" title="Center on Vehicle">🎯</button>
-        <button id="btn-refresh-blackspots" class="map-btn" title="Refresh Blackspots Layer">🗺️</button>
-      </div>
-    </section>
-
-    <!-- Right Column: Diagnostics & Simulation/Replay Controls -->
-    <section class="card" style="display: flex; flex-direction: column; gap: 12px;">
-      
-      <!-- USP 2: Diagnostics Table -->
-      <div>
-        <div class="card-header">
-          <span class="card-title">🔍 USP 2: Health Telemetry</span>
-        </div>
-        <table class="diag-table">
-          <tbody>
-            <tr>
-              <td style="color: var(--text-secondary);">Position Uncertainty (1σ)</td>
-              <td id="val-pos-unc" style="color: var(--cyan-accent);">±1.2 m</td>
-            </tr>
-            <tr>
-              <td style="color: var(--text-secondary);">Heading Uncertainty (1σ)</td>
-              <td id="val-heading-unc">±1.5°</td>
-            </tr>
-            <tr>
-              <td style="color: var(--text-secondary);">IMU Noise (Allan Var)</td>
-              <td id="val-imu-noise">0.045 m/s²</td>
-            </tr>
-            <tr>
-              <td style="color: var(--text-secondary);">Phone Dynamic Alignment</td>
-              <td id="val-aligned" style="color: var(--emerald-accent);">CALIBRATED</td>
-            </tr>
-            <tr>
-              <td style="color: var(--text-secondary);">Accumulated DR Distance</td>
-              <td id="val-dr-dist">0.0 m</td>
-            </tr>
-          </tbody>
-        </table>
+      <!-- Grab Handle for Drag / Click Toggle -->
+      <div class="sheet-handle-bar" id="sheet-drag-handle">
+        <div class="sheet-handle-pill"></div>
       </div>
 
-      <hr style="border: 0; border-top: 1px solid var(--bg-card-border);">
+      <!-- Replay Timeline Control Bar (Visible in Replay Mode) -->
+      <div id="replay-controls-panel" class="sheet-replay-bar">
+        <div class="replay-meta-row">
+          <span id="replay-drive-label" class="replay-label">Replay: Vf</span>
+          <span id="replay-time-label" class="replay-time">00:00 / 02:30</span>
+        </div>
+        <div class="replay-slider-wrap">
+          <input type="range" id="replay-scrubber" class="replay-slider" min="0" max="100" value="0">
+        </div>
+        <div class="replay-transport-row">
+          <div class="replay-buttons">
+            <button id="btn-replay-play" class="btn-transport" title="Play">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            </button>
+            <button id="btn-replay-pause" class="btn-transport" title="Pause">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+            </button>
+            <button id="btn-replay-step" class="btn-transport" title="Step">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="2.5"></line></svg>
+            </button>
+          </div>
+          <div class="replay-speed-chips">
+            <button class="chip-speed active" data-speed="1.0">1x</button>
+            <button class="chip-speed" data-speed="2.0">2x</button>
+            <button class="chip-speed" data-speed="5.0">5x</button>
+          </div>
+        </div>
+      </div>
 
-      <!-- Simulation & Interactive Controls -->
-      <div>
-        <div class="card-header">
-          <span class="card-title">🎮 Simulation & USPs</span>
+      <!-- Main Navigation Telemetry HUD (Primary Cockpit View) -->
+      <div class="sheet-hud-primary">
+        
+        <!-- Speed (Dominant), Heading, Lean Angle -->
+        <div class="hud-main-telemetry">
+          
+          <!-- Speed Cluster: Dominant Value -->
+          <div class="speed-cluster">
+            <div class="speed-number-wrap">
+              <span id="val-speed-kmh" class="speed-number">0</span>
+              <span class="speed-unit">km/h</span>
+            </div>
+            <div class="speed-secondary">
+              <span id="val-speed-mps">0.0 m/s</span>
+            </div>
+          </div>
+
+          <!-- Heading Cluster -->
+          <div class="heading-cluster">
+            <div id="val-heading-display" class="heading-value">000° N</div>
+            <div class="sub-label">Heading</div>
+          </div>
+
+          <!-- Lean Angle Cluster (Two-Wheeler Dynamics) -->
+          <div id="lean-cluster" class="lean-cluster">
+            <div class="lean-value-row">
+              <span id="val-lean-text" class="lean-value">0.0°</span>
+            </div>
+            <div class="sub-label">Lean Angle</div>
+            <div class="lean-track">
+              <div class="lean-center-tick"></div>
+              <div id="lean-indicator-marker" class="lean-marker"></div>
+            </div>
+          </div>
+
         </div>
 
-        <div class="control-group">
-          <!-- Blackout Toggle -->
-          <button id="btn-toggle-blackout" class="btn btn-secondary btn-block">
-            🌑 Simulate Tunnel Blackout
+        <!-- Cockpit Action Toolbar -->
+        <div class="hud-toolbar-row">
+          <button id="btn-map-recenter" class="btn-tool-square" title="Recenter Vehicle">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <circle cx="12" cy="12" r="3"></circle>
+            </svg>
           </button>
 
-          <!-- Test Crash -->
-          <button id="btn-test-crash" class="btn btn-secondary btn-block" style="color: var(--rose-accent);">
-            🚨 Test USP 4: Crash & SOS
+          <button id="btn-sim-blackout" class="btn-hud-action btn-outage-toggle">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 1l22 22"></path>
+              <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"></path>
+              <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"></path>
+              <path d="M10.71 5.05A16 16 0 0 1 22.58 9"></path>
+              <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"></path>
+              <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
+              <line x1="12" y1="20" x2="12.01" y2="20"></line>
+            </svg>
+            <span>Simulate Outage</span>
+          </button>
+
+          <button id="btn-finish-trip" class="btn-hud-action btn-trip-end">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+            <span>Trip Summary</span>
+          </button>
+        </div>
+
+      </div>
+
+      <!-- Expanded Detailed Telemetry Panel -->
+      <div class="sheet-expanded-panel">
+        <div class="expanded-grid">
+          <div class="expanded-item">
+            <span class="exp-label">Position Uncertainty</span>
+            <span class="exp-value" id="exp-val-unc">±1.2 m</span>
+          </div>
+          <div class="expanded-item">
+            <span class="exp-label">AI Inferred Velocity</span>
+            <span class="exp-value" id="exp-val-ai-speed">0.0 m/s</span>
+          </div>
+          <div class="expanded-item">
+            <span class="exp-label">DR Distance</span>
+            <span class="exp-value" id="exp-val-dr-dist">0.0 m</span>
+          </div>
+          <div class="expanded-item">
+            <span class="exp-label">GNSS Trust Score</span>
+            <span class="exp-value" id="exp-val-trust">100%</span>
+          </div>
+        </div>
+
+        <button id="btn-sheet-view-diag" class="btn btn-secondary btn-block btn-small">
+          Open Engineering Diagnostics
+        </button>
+      </div>
+
+    </div>
+
+  </section>
+
+  <!-- ═════════════════════════════════════════════════════════════════════════ -->
+  <!-- MODAL 0: SENSOR READINESS & LIVE ENTRY PROMPT                            -->
+  <!-- ═════════════════════════════════════════════════════════════════════════ -->
+  <div id="modal-sensor-readiness" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-top">
+        <div class="modal-heading">
+          <h2 class="modal-title">Live Sensor Check</h2>
+          <span class="modal-subtitle">Device Sensor Stream Verification</span>
+        </div>
+        <button id="btn-close-readiness" class="btn-modal-close" title="Close">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+
+      <div class="modal-content">
+        <p class="guide-intro" id="readiness-message">
+          Your smartphone sensors (accelerometer, gyroscope, GPS) are not streaming data to the navigation engine yet.
+        </p>
+
+        <div class="telemetry-table">
+          <div class="table-row">
+            <span class="field-name">Accelerometer & Gyro</span>
+            <span class="field-value" id="readiness-imu-status">○ Inactive</span>
+          </div>
+          <div class="table-row">
+            <span class="field-name">GPS Geolocation</span>
+            <span class="field-value" id="readiness-gps-status">○ Inactive</span>
+          </div>
+          <div class="table-row">
+            <span class="field-name">Security Context</span>
+            <span class="field-value" id="readiness-sec-status">Checking...</span>
+          </div>
+        </div>
+
+        <div class="action-stack" style="margin-top: 6px;">
+          <button id="btn-readiness-enable" class="btn btn-primary btn-block">
+            Enable Phone Sensors
+          </button>
+          <button id="btn-readiness-replay" class="btn btn-secondary btn-block">
+            Use Replay Demonstration Instead
           </button>
         </div>
       </div>
+    </div>
+  </div>
 
-      <hr style="border: 0; border-top: 1px solid var(--bg-card-border);">
-
-      <!-- IO-VNBD Drive Replayer -->
-      <div>
-        <div class="card-header">
-          <span class="card-title">📼 IO-VNBD Replayer</span>
-          <span id="replay-status-text" style="font-size: 0.7rem; color: var(--text-muted);">Vf (0%)</span>
+  <!-- ═════════════════════════════════════════════════════════════════════════ -->
+  <!-- MODAL 1: ENGINEERING DIAGNOSTICS & INSTRUMENT PANEL                      -->
+  <!-- ═════════════════════════════════════════════════════════════════════════ -->
+  <div id="modal-diagnostics" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-top">
+        <div class="modal-heading">
+          <h2 class="modal-title">Engineering Diagnostics</h2>
+          <span class="modal-subtitle">15-State Navigation Filter & Sensor Subsystems</span>
         </div>
-
-        <select id="select-drive" style="width: 100%; background: #0c121e; color: #fff; border: 1px solid var(--bg-card-border); padding: 6px; border-radius: var(--radius-sm); font-size: 0.8rem; margin-bottom: 6px;">
-          <option value="Vf">Vf (Motorway High Speed)</option>
-          <option value="M">M (Urban & Roundabouts)</option>
-          <option value="S">S (Curved Roads)</option>
-          <option value="Y1">Y1 (Validation Track)</option>
-          <option value="Synthetic Benchmark">Synthetic Benchmark (Turns & Tunnel)</option>
-        </select>
-
-        <div class="action-row">
-          <button id="btn-replay-play" class="btn" style="flex: 1;">▶ Play</button>
-          <button id="btn-replay-pause" class="btn btn-secondary" style="flex: 1;">⏸ Pause</button>
-          <button id="btn-replay-step" class="btn btn-secondary">⏭ Step</button>
-        </div>
-
-        <div class="replay-scrubber-container">
-          <input type="range" id="replay-scrubber" class="scrubber-slider" min="0" max="100" value="0">
-        </div>
-
-        <div class="action-row" style="margin-top: 6px;">
-          <button class="btn btn-secondary btn-speed active" data-speed="1.0" style="flex: 1; font-size: 0.75rem; padding: 4px;">1x</button>
-          <button class="btn btn-secondary btn-speed" data-speed="2.0" style="flex: 1; font-size: 0.75rem; padding: 4px;">2x</button>
-          <button class="btn btn-secondary btn-speed" data-speed="5.0" style="flex: 1; font-size: 0.75rem; padding: 4px;">5x</button>
-        </div>
-      </div>
-
-    </section>
-  </main>
-
-  <!-- USP 4: Emergency Crash Modal -->
-  <div id="crash-modal" class="modal-overlay">
-    <div class="crash-modal-card">
-      <h2 style="color: var(--rose-accent); font-size: 1.3rem;">⚠️ POTENTIAL CRASH DETECTED</h2>
-      <p style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 4px;">
-        High deceleration shock & abnormal rotation detected.
-      </p>
-
-      <div id="crash-countdown" class="crash-countdown-ring">15s</div>
-
-      <div id="crash-impact-g" style="font-weight: 700; color: #fff; font-size: 1rem;">
-        4.8g Peak Impact
-      </div>
-
-      <div id="crash-location-text" style="font-size: 0.75rem; color: var(--text-muted); margin: 8px 0; background: rgba(0,0,0,0.4); padding: 8px; border-radius: 6px;">
-        Locked Dead Reckoning Position
-      </div>
-
-      <div style="display: flex; gap: 8px; margin-top: 14px;">
-        <button id="btn-dispatch-sos" class="btn btn-danger btn-block" style="flex: 1;">
-          🆘 Send SOS Now
+        <button id="btn-close-diagnostics" class="btn-modal-close" title="Close">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
-        <button id="btn-cancel-crash" class="btn btn-secondary btn-block" style="flex: 1;">
-          I'm OK (Cancel)
+      </div>
+
+      <div class="modal-content">
+        
+        <!-- Data Provenance & Pipeline Integrity Section -->
+        <div class="telemetry-group">
+          <div class="group-title">Data Provenance & Pipeline Integrity</div>
+          <div class="telemetry-table">
+            <div class="table-row">
+              <span class="field-name">Pipeline Mode</span>
+              <span class="field-value" id="diag-pipe-mode">○ Standby (No Active Session)</span>
+            </div>
+            <div class="table-row">
+              <span class="field-name">Speed Data Source</span>
+              <span class="field-value" id="diag-src-speed">15-State ES-EKF / ZUPT (SERVER_DERIVED)</span>
+            </div>
+            <div class="table-row">
+              <span class="field-name">Heading Data Source</span>
+              <span class="field-value" id="diag-src-heading">Physical Device Compass (REAL_DEVICE)</span>
+            </div>
+            <div class="table-row">
+              <span class="field-name">Trajectory Source</span>
+              <span class="field-value" id="diag-src-trajectory">Live Geodetic GNSS / EKF Dead Reckoning</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Navigation Section -->
+        <div class="telemetry-group">
+          <div class="group-title">Navigation States</div>
+          <div class="telemetry-table">
+            <div class="table-row">
+              <span class="field-name">Position (Lat, Lon)</span>
+              <span class="field-value" id="diag-latlon">--</span>
+            </div>
+            <div class="table-row">
+              <span class="field-name">Forward Speed</span>
+              <span class="field-value" id="diag-speed-full">0.0 km/h (0.00 m/s)</span>
+            </div>
+            <div class="table-row">
+              <span class="field-name">Compass Heading</span>
+              <span class="field-value" id="diag-heading-full">--</span>
+            </div>
+            <div class="table-row">
+              <span class="field-name">Dead Reckoning Distance</span>
+              <span class="field-value" id="diag-dr-dist">0.0 m</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- GNSS Section -->
+        <div class="telemetry-group">
+          <div class="group-title">GNSS & Trust Engine</div>
+          <div class="telemetry-table">
+            <div class="table-row">
+              <span class="field-name">GNSS State</span>
+              <span class="field-value" id="diag-gnss-state">TRUSTED</span>
+            </div>
+            <div class="table-row">
+              <span class="field-name">Trust Score</span>
+              <span class="field-value" id="diag-trust-score">100%</span>
+            </div>
+            <div class="table-row">
+              <span class="field-name">Blackspots Logged</span>
+              <span class="field-value" id="diag-blackspots-count">0</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- AI Velocity Section -->
+        <div class="telemetry-group">
+          <div class="group-title">AI Velocity Estimator</div>
+          <div class="telemetry-table">
+            <div class="table-row">
+              <span class="field-name">Inferred Velocity</span>
+              <span class="field-value" id="diag-ai-speed">0.00 m/s</span>
+            </div>
+            <div class="table-row">
+              <span class="field-name">Acceptance Rate</span>
+              <span class="field-value" id="diag-ai-accept-rate">100%</span>
+            </div>
+            <div class="table-row">
+              <span class="field-name">Architecture</span>
+              <span class="field-value">1D-CNN + 2-Layer GRU (Frozen)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ES-EKF Section -->
+        <div class="telemetry-group">
+          <div class="group-title">15-State Error-State EKF</div>
+          <div class="telemetry-table">
+            <div class="table-row">
+              <span class="field-name">Position Uncertainty (1σ)</span>
+              <span class="field-value" id="diag-pos-unc">±1.2 m</span>
+            </div>
+            <div class="table-row">
+              <span class="field-name">Heading Uncertainty (1σ)</span>
+              <span class="field-value" id="diag-heading-unc">±1.5°</span>
+            </div>
+            <div class="table-row">
+              <span class="field-name">Dynamic Gravity Leveling</span>
+              <span class="field-value status-active" id="diag-gravity-status">Active (SO(3) Right)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Hardware Sensors Section -->
+        <div class="telemetry-group">
+          <div class="group-title">Hardware Sensors</div>
+          <div class="telemetry-table">
+            <div class="table-row">
+              <span class="field-name">Accelerometer</span>
+              <span class="field-value" id="diag-hw-accel">○ Standby</span>
+            </div>
+            <div class="table-row">
+              <span class="field-name">Gyroscope</span>
+              <span class="field-value" id="diag-hw-gyro">○ Standby</span>
+            </div>
+            <div class="table-row">
+              <span class="field-name">Orientation Compass</span>
+              <span class="field-value" id="diag-hw-ori">○ Standby</span>
+            </div>
+            <div class="table-row">
+              <span class="field-name">GPS Geolocation</span>
+              <span class="field-value" id="diag-hw-gps">○ Standby</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Two-Wheeler Dynamics & Crash Safety Section -->
+        <div class="telemetry-group">
+          <div class="group-title">Two-Wheeler Dynamics & Safety (USPs 3 & 4)</div>
+          <div class="telemetry-table">
+            <div class="table-row">
+              <span class="field-name">Lean Angle</span>
+              <span class="field-value" id="diag-dyn-lean">0.0°</span>
+            </div>
+            <div class="table-row">
+              <span class="field-name">Non-Holonomic Constraints</span>
+              <span class="field-value status-active">Enabled (vy ≈ 0, vz ≈ 0)</span>
+            </div>
+            <div class="table-row">
+              <span class="field-name">Crash Detection (USP 4)</span>
+              <span class="field-value status-active" id="diag-crash-status">MONITORING</span>
+            </div>
+          </div>
+          <button id="btn-diag-test-crash" class="btn btn-secondary btn-block btn-small" style="margin-top: 4px;">
+            Simulate Impact Test (USP 4 Demonstration)
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ═════════════════════════════════════════════════════════════════════════ -->
+  <!-- MODAL 2: SESSION SUMMARY & TRIP REPORT                                   -->
+  <!-- ═════════════════════════════════════════════════════════════════════════ -->
+  <div id="modal-summary" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-top">
+        <div class="modal-heading">
+          <h2 class="modal-title">Trip Summary</h2>
+          <span class="modal-subtitle">Navigation Performance Report</span>
+        </div>
+        <button id="btn-close-summary" class="btn-modal-close" title="Close">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
+      </div>
+
+      <div class="modal-content">
+        
+        <div class="summary-hero">
+          <div class="summary-stat">
+            <span class="stat-big" id="sum-total-dist">0.0 km</span>
+            <span class="stat-sub">Distance</span>
+          </div>
+          <div class="summary-stat">
+            <span class="stat-big" id="sum-duration">00:00</span>
+            <span class="stat-sub">Time</span>
+          </div>
+        </div>
+
+        <div class="telemetry-group">
+          <div class="group-title">Performance Metrics</div>
+          <div class="telemetry-table">
+            <div class="table-row">
+              <span class="field-name">GNSS Outage Duration</span>
+              <span class="field-value highlight-amber" id="sum-outage-time">0.0 s</span>
+            </div>
+            <div class="table-row">
+              <span class="field-name">Dead Reckoning Distance</span>
+              <span class="field-value highlight-amber" id="sum-dr-dist">0.0 m</span>
+            </div>
+            <div class="table-row">
+              <span class="field-name">Peak Position Uncertainty (1σ)</span>
+              <span class="field-value" id="sum-peak-unc">±1.2 m</span>
+            </div>
+            <div class="table-row">
+              <span class="field-name">AI Speed Acceptance Rate</span>
+              <span class="field-value" id="sum-ai-rate">100%</span>
+            </div>
+            <div class="table-row">
+              <span class="field-name">Vehicle Configuration</span>
+              <span class="field-value" id="sum-veh-type">Two-Wheeler</span>
+            </div>
+            <div class="table-row">
+              <span class="field-name">Blackspot Zones Encountered</span>
+              <span class="field-value" id="sum-blackspots">0</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button id="btn-summary-reset" class="btn btn-primary btn-block">
+            Start New Navigation
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ═════════════════════════════════════════════════════════════════════════ -->
+  <!-- MODAL 3: PHONE SENSOR SETUP & PERMISSION GUIDE                           -->
+  <!-- ═════════════════════════════════════════════════════════════════════════ -->
+  <div id="modal-sensor-guide" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-top">
+        <div class="modal-heading">
+          <h2 class="modal-title">Live Sensor Configuration</h2>
+          <span class="modal-subtitle">Browser Security & Hardware Permissions</span>
+        </div>
+        <button id="btn-close-sensor-guide" class="btn-modal-close" title="Close">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+
+      <div class="modal-content">
+        
+        <p class="guide-intro">
+          Modern mobile browsers (Chrome on Android, Safari on iOS) require a <b>Secure Context (HTTPS)</b> to grant access to hardware IMU (accelerometer/gyroscope) and GPS sensors.
+        </p>
+
+        <!-- Primary Recommended Path: HTTPS -->
+        <div class="telemetry-group">
+          <div class="group-title">Primary Path: Secure HTTPS Server (Recommended)</div>
+          <p class="guide-text">
+            Start the secure backend server on your development computer:
+          </p>
+          <code class="guide-code block">python -m idr.server.run_server --ssl</code>
+          <p class="guide-text" style="margin-top: 6px;">
+            Then open the secure URL on your mobile browser:
+          </p>
+          <code id="guide-https-url" class="guide-code highlight">https://192.168.2.208:8000</code>
+        </div>
+
+        <!-- Secondary Path: Dev-only flag -->
+        <div class="telemetry-group">
+          <div class="group-title">Secondary Path: Development-Only HTTP Flag</div>
+          <p class="guide-text" style="margin-bottom: 6px;">
+            For local testing over HTTP without SSL certificates:
+          </p>
+          <ol class="guide-steps">
+            <li>In Chrome on your phone, navigate to:<br>
+              <code class="guide-code">chrome://flags/#unsafely-treat-insecure-origin-as-secure</code>
+            </li>
+            <li>Enable the flag and add your server origin:<br>
+              <code id="guide-flag-url" class="guide-code highlight">http://192.168.2.208:8000</code>
+            </li>
+            <li>Tap <b>Relaunch Chrome</b> at the bottom.</li>
+          </ol>
+        </div>
+
+        <div class="modal-actions">
+          <button id="btn-guide-retry" class="btn btn-primary btn-block">
+            Request / Retry Sensor Access
+          </button>
+        </div>
+
       </div>
     </div>
   </div>
