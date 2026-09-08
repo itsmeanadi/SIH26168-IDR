@@ -680,9 +680,9 @@ class ErrorStateKalmanFilter:
         gate = (max_innovation_sigma ** 2)
         accepted, diag = self.update_measurement(np.array([speed_mps]), h_x, H, R_cov, "ai_velocity", gate)
         if not accepted:
-            # If the filter has accumulated severe runaway velocity (> 10 m/s discrepancy while AI reports physical speed),
+            # If the filter has accumulated severe runaway velocity (> 15 m/s while AI reports low physical speed < 5 m/s),
             # re-anchor the forward velocity to the AI measurement to self-heal integration divergence
-            if abs(float(h_x[0]) - speed_mps) > 10.0 and speed_mps < 45.0:
+            if abs(float(h_x[0])) > 15.0 and speed_mps < 5.0:
                 v_body_healed = v_body.copy()
                 v_body_healed[0] = speed_mps
                 self.v = R @ v_body_healed

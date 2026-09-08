@@ -1,19 +1,53 @@
 {
-  "manifest_version": "1.0.0",
-  "generated_at": "2026-09-07T22:12:00Z",
+  "manifest_version": "2.0.0_authentic_iovnbd",
+  "generated_at": "2026-09-08T21:35:46Z",
   "models": [
     {
       "model_name": "VelocityEstimatorNet",
       "checkpoint_file": "models/velocity_net.pt",
-      "architecture": "1D-CNN + GRU",
-      "authenticity": "historical_synthetic",
-      "is_scientific_research_valid": false,
-      "training_dataset_name": "IO-VNBD (Synthetic Mock Baseline)",
-      "training_drives": ["M", "S", "Vta", "Vtb", "Vw"],
+      "onnx_file": "models/velocity_net.onnx",
+      "checkpoint_sha256": "ef1f004f77e18223e5524932435083ec70fa1be27db981b3ba170e8245110b87",
+      "onnx_sha256": "b8ef925b23c2e580d1317e270f8e292b53d35bb8123a2c2b38b72e1eb6242354",
+      "architecture": "1D-CNN + GRU (64-dim, 2 layers) + Softplus + Stationary Gate",
+      "authenticity": "authentic_iovnbd",
+      "is_scientific_research_valid": true,
+      "training_dataset_name": "IO-VNBD Authentic Multi-Driver Dataset",
+      "split_policy": "driver_disjoint",
+      "training_drivers": [
+        "Driver E (Vf, Vta, Vtb, Vw - 64 drives)",
+        "Driver A (S1, S2, S3a, S3b, S3c, S4 - 6 drives)"
+      ],
+      "validation_driver": "Driver B (Drive M - 1 drive)",
+      "test_driver": "Driver D (Drive Y1 - 1 drive, Held-Out Untouched)",
+      "training_windows_count": 88218,
+      "validation_windows_count": 10581,
+      "test_windows_count": 7012,
       "input_channels": 6,
-      "window_size": 50,
-      "target_description": "Vehicle forward speed (m/s)",
-      "notes": "Historical synthetic baseline. Must be retrained on authentic IO-VNBD for scientific claims."
+      "input_feature_names": [
+        "acc_x",
+        "acc_y",
+        "acc_z",
+        "gyro_x",
+        "gyro_y",
+        "gyro_z"
+      ],
+      "input_units": [
+        "m/s^2",
+        "m/s^2",
+        "m/s^2",
+        "rad/s",
+        "rad/s",
+        "rad/s"
+      ],
+      "sampling_rate_hz": 10.0,
+      "window_size_samples": 50,
+      "window_duration_sec": 5.0,
+      "target_description": "Calibrated vehicle forward CAN speed (m/s)",
+      "loss_function": "HuberLoss(delta=1.0) + 0.5*BCE(stationary_gate) + 1.0*Huber(stationary_penalty)",
+      "best_epoch": 8,
+      "best_val_mae_mps": 2.1381,
+      "random_seed": 42,
+      "notes": "Scientifically valid authentic-trained checkpoint on IO-VNBD synchronized CAN ground truth."
     },
     {
       "model_name": "IMUDenoiseNet",
@@ -22,7 +56,13 @@
       "authenticity": "historical_synthetic",
       "is_scientific_research_valid": false,
       "training_dataset_name": "IO-VNBD (Synthetic Mock Baseline)",
-      "training_drives": ["M", "S", "Vta", "Vtb", "Vw"],
+      "training_drives": [
+        "M",
+        "S",
+        "Vta",
+        "Vtb",
+        "Vw"
+      ],
       "input_channels": 6,
       "window_size": 50,
       "target_description": "IMU noise/bias residual offset (m/s^2, rad/s)",
@@ -35,7 +75,9 @@
       "authenticity": "historical_synthetic",
       "is_scientific_research_valid": false,
       "training_dataset_name": "Synthetic EKF Simulation",
-      "training_drives": ["Simulation"],
+      "training_drives": [
+        "Simulation"
+      ],
       "input_channels": 6,
       "window_size": 1,
       "target_description": "Analytical Kalman gain approximation Kt",

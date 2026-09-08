@@ -22,11 +22,28 @@ __all__ = [
     "EvaluationSpec",
     "EvaluationProvenanceAudit",
     "EvaluationRunResult",
+    "ExperimentHarness",
+    "ExperimentResult",
+    "ExperimentMetadata",
+    "TimingAndSamplingStats",
+    "SpeedAccuracyMetrics",
+    "DeadReckoningMetrics",
 ]
 
 def __getattr__(name):
-    """Load the optional torch-backed benchmark only when it is requested."""
+    """Load optional or circular-dependent modules dynamically on access."""
     if name == "simulate_blackout_benchmark":
         from .blackout import simulate_blackout_benchmark
         return simulate_blackout_benchmark
-    raise AttributeError(name)
+    if name in (
+        "ExperimentHarness",
+        "ExperimentResult",
+        "ExperimentMetadata",
+        "TimingAndSamplingStats",
+        "SpeedAccuracyMetrics",
+        "DeadReckoningMetrics",
+    ):
+        from . import experiment_runner
+        return getattr(experiment_runner, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+

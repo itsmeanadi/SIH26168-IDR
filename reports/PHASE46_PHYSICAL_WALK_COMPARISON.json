@@ -1,0 +1,32 @@
+{
+  "historical_synthetic": {
+    "checkpoint_name": "Historical Synthetic (Mock)",
+    "checkpoint_sha256": "74021baf47322ea6a0f60f98a1071e31686b1f1f82cd6287cff17d54f79d823b",
+    "stationary_initial_mean_mps": 17.274,
+    "stationary_initial_peak_mps": 17.274,
+    "walking_mean_mps": 17.274,
+    "walking_peak_mps": 17.274,
+    "stopping_mean_mps": 17.274,
+    "stopping_final_mps": 17.274
+  },
+  "authentic_huber": {
+    "checkpoint_name": "Authentic Huber (No Gate Loss)",
+    "checkpoint_sha256": "79fc78ec41821c701e86a6a9094af2b7c4cce79f84c63c826481fb377e57e24a",
+    "stationary_initial_mean_mps": 0.168,
+    "stationary_initial_peak_mps": 0.542,
+    "walking_mean_mps": 0.13,
+    "walking_peak_mps": 0.189,
+    "stopping_mean_mps": 3.584,
+    "stopping_final_mps": 6.743
+  },
+  "authentic_gate": {
+    "checkpoint_name": "Authentic Huber + Stationary Gate",
+    "checkpoint_sha256": "ef1f004f77e18223e5524932435083ec70fa1be27db981b3ba170e8245110b87",
+    "stationary_initial_mean_mps": 0.05,
+    "stationary_initial_peak_mps": 0.206,
+    "walking_mean_mps": 0.035,
+    "walking_peak_mps": 0.05,
+    "stopping_mean_mps": 3.295,
+    "stopping_final_mps": 7.719
+  }
+}

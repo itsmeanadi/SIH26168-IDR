@@ -112,6 +112,15 @@ class SensorFrameRequest(BaseModel):
     orientation_yaw: Optional[float] = None
     orientation_pitch: Optional[float] = None
     orientation_roll: Optional[float] = None
+    # Forensic Raw Sensor & Timing
+    raw_alpha: Optional[float] = None
+    raw_beta: Optional[float] = None
+    raw_gamma: Optional[float] = None
+    is_absolute: Optional[bool] = None
+    has_webkit_heading: Optional[bool] = None
+    webkit_compass_heading: Optional[float] = None
+    orientation_event_type: Optional[str] = None
+    screen_orientation_angle: Optional[float] = None
     # GNSS
     gnss_lat: Optional[float] = None
     gnss_lon: Optional[float] = None
@@ -119,6 +128,7 @@ class SensorFrameRequest(BaseModel):
     gnss_accuracy_m: Optional[float] = 3.0
     gnss_speed_mps: Optional[float] = None
     gnss_heading_deg: Optional[float] = None
+    gnss_timestamp: Optional[float] = None
 
 
 class ReplayControlRequest(BaseModel):
@@ -385,6 +395,7 @@ def list_recorded_sessions():
 def process_single_frame(req: SensorFrameRequest):
     """REST endpoint for single sensor frame ingestion."""
     t = req.timestamp or time.time()
+    t_recv = time.time()
     imu = SensorInputFrame(
         timestamp=t,
         acc_x=req.acc_x,
@@ -399,11 +410,20 @@ def process_single_frame(req: SensorFrameRequest):
         orientation_yaw=req.orientation_yaw,
         orientation_pitch=req.orientation_pitch,
         orientation_roll=req.orientation_roll,
+        raw_alpha=req.raw_alpha,
+        raw_beta=req.raw_beta,
+        raw_gamma=req.raw_gamma,
+        is_absolute=req.is_absolute,
+        has_webkit_heading=req.has_webkit_heading,
+        webkit_compass_heading=req.webkit_compass_heading,
+        orientation_event_type=req.orientation_event_type,
+        screen_orientation_angle=req.screen_orientation_angle,
+        server_receive_time=t_recv,
     )
     gnss = None
     if req.gnss_lat is not None and req.gnss_lon is not None:
         gnss = GNSSInputFix(
-            timestamp=t,
+            timestamp=req.gnss_timestamp or t,
             latitude=req.gnss_lat,
             longitude=req.gnss_lon,
             altitude=req.gnss_alt or 0.0,
@@ -429,6 +449,14 @@ async def websocket_navigation(websocket: WebSocket):
     """High-rate bidirectional streaming endpoint for mobile web sensors."""
     await websocket.accept()
     active_websockets.append(websocket)
+    if not recorder.is_recording:
+        try:
+            recorder.start_session(
+                notes="Live physical device session",
+                vehicle_type=engine.vehicle_type,
+            )
+        except Exception:
+            pass
     try:
         while True:
             text = await websocket.receive_text()
@@ -439,6 +467,7 @@ async def websocket_navigation(websocket: WebSocket):
                 imu_dict = data.get("imu", {})
                 gnss_dict = data.get("gnss")
                 t = imu_dict.get("timestamp", time.time())
+                t_recv = time.time()
 
                 imu = SensorInputFrame(
                     timestamp=t,
@@ -454,6 +483,15 @@ async def websocket_navigation(websocket: WebSocket):
                     orientation_yaw=imu_dict.get("orientation_yaw"),
                     orientation_pitch=imu_dict.get("orientation_pitch"),
                     orientation_roll=imu_dict.get("orientation_roll"),
+                    raw_alpha=imu_dict.get("raw_alpha"),
+                    raw_beta=imu_dict.get("raw_beta"),
+                    raw_gamma=imu_dict.get("raw_gamma"),
+                    is_absolute=imu_dict.get("is_absolute"),
+                    has_webkit_heading=imu_dict.get("has_webkit_heading"),
+                    webkit_compass_heading=imu_dict.get("webkit_compass_heading"),
+                    orientation_event_type=imu_dict.get("orientation_event_type"),
+                    screen_orientation_angle=imu_dict.get("screen_orientation_angle"),
+                    server_receive_time=t_recv,
                 )
 
                 gnss = None

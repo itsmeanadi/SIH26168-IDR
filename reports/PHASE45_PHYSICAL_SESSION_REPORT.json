@@ -1,0 +1,82 @@
+{
+  "metadata": {
+    "experiment_id": "phase45_physical_replay_exp_20260908_172204",
+    "provenance_type": "REAL_DEVICE_OBSERVATION",
+    "dataset_role": "FIELD_TRIAL",
+    "dataset_name": "exp_20260908_172204_two_wheeler",
+    "source_path": "data\\sessions\\exp_20260908_172204_two_wheeler\\telemetry.csv",
+    "model_checkpoint_file": "models\\velocity_net.pt",
+    "model_checkpoint_sha256": "ef1f004f77e18223e5524932435083ec70fa1be27db981b3ba170e8245110b87",
+    "model_authenticity": "authentic_iovnbd",
+    "is_scientific_research_valid": true,
+    "timestamp_utc": "2026-09-08T21:37:47.367284+00:00",
+    "leakage_audit_passed": true,
+    "notes": "Qualitative out-of-domain evaluation on real Android GPS-denied walk with authentic checkpoint."
+  },
+  "timing": {
+    "total_duration_sec": 298.904000043869,
+    "total_samples": 5850,
+    "dt_mean_ms": 33.879487179487185,
+    "dt_median_ms": 33.0,
+    "dt_std_ms": 10.233864000786204,
+    "dt_min_ms": 19.0,
+    "dt_max_ms": 401.0,
+    "effective_hz": 29.516385378036773,
+    "stationary_duration_sec": 93.90100000000002,
+    "movement_duration_sec": 104.29400000000003
+  },
+  "ai_velocity": {
+    "has_reference": false,
+    "peak_pred_mps": 11.7,
+    "mean_pred_mps": 1.7183777777777778,
+    "peak_ref_mps": null,
+    "mean_ref_mps": null,
+    "mae_mps": null,
+    "rmse_mps": null,
+    "mean_bias_mps": null,
+    "mae_kmh": null,
+    "rmse_kmh": null,
+    "regime_low_speed_mae": null,
+    "regime_med_speed_mae": null,
+    "regime_high_speed_mae": null
+  },
+  "ekf_velocity": {
+    "has_reference": false,
+    "peak_pred_mps": 28.54,
+    "mean_pred_mps": 1.5212888888888891,
+    "peak_ref_mps": null,
+    "mean_ref_mps": null,
+    "mae_mps": null,
+    "rmse_mps": null,
+    "mean_bias_mps": null,
+    "mae_kmh": null,
+    "rmse_kmh": null,
+    "regime_low_speed_mae": null,
+    "regime_med_speed_mae": null,
+    "regime_high_speed_mae": null
+  },
+  "dead_reckoning": {
+    "total_dr_distance_m": 35.1,
+    "reference_distance_m": null,
+    "distance_error_m": null,
+    "distance_error_percent": null,
+    "endpoint_position_error_m": null,
+    "mean_heading_deg": 88.8391111111111,
+    "final_heading_deg": 127.8,
+    "heading_error_deg": null,
+    "zupt_intervals_count": 52,
+    "ai_accepted_count": 4506,
+    "ai_rejected_count": 1344,
+    "ai_acceptance_rate_percent": 77.02564102564102,
+    "ai_mean_nis": 24.21342170910091,
+    "gnss_state": "GPS_PERMISSION_DENIED",
+    "blackout_duration_sec": 298.904000043869
+  },
+  "diagnostics": {
+    "initial_standstill_speed_mps": 0.0,
+    "final_stopping_speed_mps": -0.89,
+    "final_is_stationary": false,
+    "approx_user_reported_distance_m": 10.0,
+    "user_reported_distance_is_ground_truth": false
+  }
+}

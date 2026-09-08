@@ -102,6 +102,7 @@ class IDREngineClient {
           gnss_accuracy_m: gnss ? gnss.accuracy_m : null,
           gnss_speed_mps: gnss ? gnss.speed_mps : null,
           gnss_heading_deg: gnss ? gnss.heading_deg : null,
+          gnss_timestamp: gnss ? gnss.timestamp : null,
         }),
       });
       const state = await res.json();

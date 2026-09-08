@@ -316,15 +316,27 @@ class MobileSensorLayer {
   _handleOrientation(event) {
     if (!this.isActive || !event) return;
 
-    let compassHeading = null;
     const isAbsolute = Boolean(event.absolute);
+    const eventType = event.type || (isAbsolute ? 'deviceorientationabsolute' : 'deviceorientation');
+
+    // If absolute orientation is already streaming, prevent standard relative orientation from clobbering it
+    if (this._hasReceivedAbsoluteOrientation && !isAbsolute && eventType === 'deviceorientation') {
+      return;
+    }
+    if (isAbsolute) {
+      this._hasReceivedAbsoluteOrientation = true;
+    }
+
+    let compassHeading = null;
     const alpha = event.alpha !== null && event.alpha !== undefined ? Number(event.alpha) : null;
     const beta = event.beta !== null && event.beta !== undefined ? Number(event.beta) : 0.0;
     const gamma = event.gamma !== null && event.gamma !== undefined ? Number(event.gamma) : 0.0;
+    const webkitHeading = (event.webkitCompassHeading !== undefined && event.webkitCompassHeading !== null) ? Number(event.webkitCompassHeading) : null;
+    const screenAngle = (typeof window !== 'undefined' && window.screen && window.screen.orientation) ? (Number(window.screen.orientation.angle) || 0) : (Number(window.orientation) || 0);
 
-    if (event.webkitCompassHeading !== undefined && event.webkitCompassHeading !== null) {
+    if (webkitHeading !== null && Number.isFinite(webkitHeading)) {
       // iOS WebKit: provides true/magnetic compass heading directly (0=North, 90=East, clockwise)
-      compassHeading = Number(event.webkitCompassHeading);
+      compassHeading = webkitHeading;
     } else if (alpha !== null && Number.isFinite(alpha)) {
       // W3C DeviceOrientation (Android Chrome / Standard):
       // alpha is degrees counter-clockwise from North [0..360).
@@ -337,6 +349,14 @@ class MobileSensorLayer {
       this.latestImu.orientation_yaw = compassHeading;
       this.latestImu.orientation_pitch = beta;
       this.latestImu.orientation_roll = gamma;
+      this.latestImu.raw_alpha = alpha;
+      this.latestImu.raw_beta = beta;
+      this.latestImu.raw_gamma = gamma;
+      this.latestImu.is_absolute = isAbsolute;
+      this.latestImu.has_webkit_heading = webkitHeading !== null;
+      this.latestImu.webkit_compass_heading = webkitHeading;
+      this.latestImu.orientation_event_type = eventType;
+      this.latestImu.screen_orientation_angle = screenAngle;
 
       this.telemetry.orientation.hasData = true;
       this.telemetry.orientation.status = 'ACTIVE';
@@ -345,7 +365,9 @@ class MobileSensorLayer {
       this.telemetry.orientation.raw = [compassHeading, beta, gamma];
       this.telemetry.orientation.rawAlpha = alpha;
       this.telemetry.orientation.isAbsolute = isAbsolute;
-      this.telemetry.orientation.hasWebkitHeading = event.webkitCompassHeading !== undefined && event.webkitCompassHeading !== null;
+      this.telemetry.orientation.hasWebkitHeading = webkitHeading !== null;
+      this.telemetry.orientation.eventType = eventType;
+      this.telemetry.orientation.screenAngle = screenAngle;
     }
   }
 

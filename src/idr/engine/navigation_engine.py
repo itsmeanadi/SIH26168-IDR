@@ -52,6 +52,16 @@ class SensorInputFrame:
     orientation_yaw: Optional[float] = None
     orientation_pitch: Optional[float] = None
     orientation_roll: Optional[float] = None
+    # Forensic RAW browser / timing fields
+    raw_alpha: Optional[float] = None
+    raw_beta: Optional[float] = None
+    raw_gamma: Optional[float] = None
+    is_absolute: Optional[bool] = None
+    has_webkit_heading: Optional[bool] = None
+    webkit_compass_heading: Optional[float] = None
+    orientation_event_type: Optional[str] = None
+    screen_orientation_angle: Optional[float] = None
+    server_receive_time: Optional[float] = None
 
 
 @dataclass
@@ -91,6 +101,7 @@ class NavigationOutputState:
     diagnostics: HealthDiagnostics
     active_blackspot_id: Optional[str]
     active_crash_alert: Optional[CrashAlert]
+    forensics: Optional[Dict[str, Any]] = None
 
 
 class NavigationEngine:
@@ -228,14 +239,25 @@ class NavigationEngine:
             gyro_raw = np.nan_to_num(gyro_raw, nan=0.0, posinf=0.0, neginf=0.0)
 
         # 0. Dynamic Frame Integration Delta (dt) Calculation
-        if hasattr(self, 'last_imu_timestamp') and self.last_imu_timestamp is not None and imu.timestamp is not None:
-            raw_dt = float(imu.timestamp - self.last_imu_timestamp)
-            if 0.001 <= raw_dt <= 0.5:
+        prev_t = getattr(self, 'last_imu_timestamp', None)
+        is_out_of_order = False
+        dt_source = "nominal_default"
+        if prev_t is not None and imu.timestamp is not None:
+            raw_dt = float(imu.timestamp - prev_t)
+            if raw_dt <= 0.0:
+                is_out_of_order = True
+                step_dt = self.dt
+                dt_source = "out_of_order_fallback"
+            elif 0.001 <= raw_dt <= 0.5:
                 step_dt = raw_dt
+                dt_source = "event_delta"
             else:
                 step_dt = self.dt
+                dt_source = "nominal_clamped"
         else:
             step_dt = self.dt
+            dt_source = "initial_nominal"
+
         if imu.timestamp is not None:
             self.last_imu_timestamp = float(imu.timestamp)
 
@@ -243,20 +265,28 @@ class NavigationEngine:
         self.health_engine.update_sensor_stats(acc_raw, gyro_raw)
 
         # 2. Stationary / ZUPT Detection (with velocity-aware gating)
-        vel_init = self.fusion.velocity_enu
-        if gnss is not None and gnss.speed_mps is not None and np.isfinite(gnss.speed_mps):
+        # When physical GNSS speed is available and trusted, use it as speed gate.
+        # During GNSS outage / denied GNSS, do not feed uncorrected drifting EKF velocity into detector,
+        # otherwise high EKF velocity prevents StationaryDetector from latching rest upon stopping.
+        if gnss is not None and gnss.speed_mps is not None and np.isfinite(gnss.speed_mps) and getattr(self, 'has_physical_gps_fix', False):
             est_speed = float(gnss.speed_mps)
+        elif self.latest_ai_speed > 0.0 and self.ai_accepted_count > 0:
+            est_speed = float(self.latest_ai_speed)
         else:
-            est_speed = float(np.hypot(vel_init[0], vel_init[1]))
+            est_speed = None
         is_stationary = self.stationary_detector.update(acc_raw, gyro_raw, speed_mps=est_speed)
 
-        # Compute dynamic specific force (linear acceleration) by removing true attitude-dependent body gravity
+        # Compute dynamic specific force (linear acceleration) in body frame
         pitch_rad_in = float(np.deg2rad(imu.orientation_pitch)) if (imu.orientation_pitch is not None and np.isfinite(imu.orientation_pitch)) else None
         roll_rad_in = float(np.deg2rad(imu.orientation_roll)) if (imu.orientation_roll is not None and np.isfinite(imu.orientation_roll)) else None
         if pitch_rad_in is not None and roll_rad_in is not None:
+            # W3C DeviceOrientation Euler convention:
+            # beta = pitch around X (positive = top raised -> +Y reaction force: +g*sin(pitch))
+            # gamma = roll around Y (positive = right down -> -X reaction force: -g*sin(roll)*cos(pitch))
+            # Z reaction force = +g*cos(pitch)*cos(roll)
             g_body = np.array([
-                9.80665 * np.sin(roll_rad_in) * np.cos(pitch_rad_in),
-                -9.80665 * np.sin(pitch_rad_in),
+                -9.80665 * np.sin(roll_rad_in) * np.cos(pitch_rad_in),
+                9.80665 * np.sin(pitch_rad_in),
                 9.80665 * np.cos(pitch_rad_in) * np.cos(roll_rad_in),
             ], dtype=np.float64)
         elif self.aligner.z_phone is not None:
@@ -284,6 +314,10 @@ class NavigationEngine:
             )
 
         # Rotate IMU measurements into vehicle frame [Forward X_v, Lateral Y_v, Vertical Z_v]
+        # Coordinate Frame Definition:
+        # X_v: Vehicle Forward (longitudinal)
+        # Y_v: Vehicle Lateral (left/right)
+        # Z_v: Vehicle Vertical (upward)
         if self.aligner.is_calibrated or self.aligner.z_phone is not None:
             acc_vehicle, gyro_vehicle = self.aligner.transform_imu(
                 acc_raw.reshape(1, 3), gyro_raw.reshape(1, 3)
@@ -294,7 +328,6 @@ class NavigationEngine:
             roll_rate = float(gyro_vehicle[0, 0])
             pitch_rate = float(gyro_vehicle[0, 1])
             yaw_rate = float(gyro_vehicle[0, 2])
-
         else:
             # Fallback when uncalibrated and vertical axis is not yet estimated
             fwd_accel = float(acc_raw[0])
@@ -304,11 +337,23 @@ class NavigationEngine:
             pitch_rate = float(gyro_raw[1])
             yaw_rate = float(gyro_raw[2])
 
+        # Heading determination and source arbitration
+        # An orientation source is verified absolute if explicitly marked absolute, has WebKit heading,
+        # or when is_absolute is not False (e.g. simulation/test frame providing orientation_yaw).
+        # When is_absolute is False, it is explicitly relative and cannot overwrite verified absolute heading.
+        is_verified_absolute = bool(imu.is_absolute is True or getattr(imu, 'has_webkit_heading', False) or (imu.is_absolute is None and imu.orientation_yaw is not None))
+        psi_compass = None
+        if imu.orientation_yaw is not None and np.isfinite(imu.orientation_yaw):
+            if is_verified_absolute:
+                psi_compass = float(np.deg2rad(90.0 - imu.orientation_yaw))
+
         # Initialize ES-EKF leveling & initial attitude on first frame using leveled vehicle-frame specific force
+        # The ES-EKF quaternion represents Vehicle Body (B_v) -> ENU (N).
+        # Since acc_vehicle has already been leveled into vehicle frame, initial vehicle pitch and roll are ~0.
         if self.navigation_filter in ("es_ekf", "15state") and self.fusion.es_ekf is not None:
             if not self._has_initialized_leveling:
-                psi_init = float(np.deg2rad(90.0 - imu.orientation_yaw)) if (imu.orientation_yaw is not None and np.isfinite(imu.orientation_yaw)) else (
-                    float(np.deg2rad(90.0 - gnss.heading_deg)) if (gnss is not None and gnss.heading_deg is not None and np.isfinite(gnss.heading_deg)) else 0.0
+                psi_init = psi_compass if psi_compass is not None else (
+                    float(np.deg2rad(90.0 - gnss.heading_deg)) if (gnss is not None and gnss.heading_deg is not None and np.isfinite(gnss.heading_deg) and (gnss.speed_mps or 0.0) >= 1.5) else 0.0
                 )
                 self.fusion.es_ekf.initialize_leveling(
                     np.array([fwd_accel, lat_accel, vert_accel], dtype=np.float64),
@@ -346,12 +391,12 @@ class NavigationEngine:
                         if np.isfinite(val) and val >= 0.0:
                             self.latest_ai_speed = 0.0 if is_stationary else val
                             self.has_new_ai_estimate = True
-                            if val < 0.5:
-                                self.last_ai_sigma = 1.5
-                            elif val < 15.0:
-                                self.last_ai_sigma = 3.0
+                            if val < 2.0:
+                                self.last_ai_sigma = 0.6
+                            elif val < 10.0:
+                                self.last_ai_sigma = 1.0
                             else:
-                                self.last_ai_sigma = 4.5
+                                self.last_ai_sigma = 1.8
                 except Exception:
                     self.has_new_ai_estimate = False
 
@@ -369,51 +414,44 @@ class NavigationEngine:
         else:
             self.current_lean_angle = 0.0
 
-        # 6. Filter Prediction Step with 3D IMU or pitch slope compensation
-        pitch_rad = (
-            float(np.deg2rad(imu.orientation_pitch))
-            if (imu.orientation_pitch is not None and np.isfinite(imu.orientation_pitch))
-            else 0.0
-        )
-        roll_rad = (
-            float(np.deg2rad(imu.orientation_roll))
-            if (imu.orientation_roll is not None and np.isfinite(imu.orientation_roll))
-            else 0.0
-        )
+        # 6. Filter Prediction Step with 3D IMU in VEHICLE frame
+        # Vehicle attitude represents Vehicle Body (B_v) -> ENU (N).
+        # Vehicle roll is two-wheeler motorcycle lean angle.
+        # Vehicle pitch is road grade incline (0.0 for level ground).
+        # Raw phone mounting tilt (beta, gamma) MUST NOT be injected as vehicle attitude.
+        veh_roll_rad = float(self.current_lean_angle)
+        veh_pitch_rad = 0.0
 
         if self.navigation_filter in ("es_ekf", "15state") and self.fusion.es_ekf is not None:
             acc_3d = np.array([fwd_accel, lat_accel, vert_accel], dtype=np.float64)
             gyro_3d = np.array([roll_rate, pitch_rate, yaw_rate], dtype=np.float64)
             self.fusion.es_ekf.predict(acc_3d, gyro_3d, dt=step_dt)
 
-            # Fuse 3D attitude to constrain pitch/roll drift and eliminate spurious forward acceleration from gravity bleed
-            psi_compass = float(np.deg2rad(90.0 - imu.orientation_yaw)) if (imu.orientation_yaw is not None and np.isfinite(imu.orientation_yaw)) else None
+            # Fuse vehicle attitude (lean roll & verified compass yaw) without double-rotating gravity
             self.fusion.es_ekf.update_attitude(
-                roll_rad=roll_rad if imu.orientation_roll is not None else None,
-                pitch_rad=pitch_rad if imu.orientation_pitch is not None else None,
+                roll_rad=veh_roll_rad,
+                pitch_rad=veh_pitch_rad,
                 yaw_rad=psi_compass if (gnss is None or gnss.speed_mps is None or gnss.speed_mps < 1.5) else None,
                 sigma_att=0.08,
             )
         else:
-            self.fusion.ekf.predict(fwd_accel, yaw_rate, pitch_rad=pitch_rad)
+            self.fusion.ekf.predict(fwd_accel, yaw_rate, pitch_rad=veh_pitch_rad)
 
         # 7. Apply ZUPT & ZARU & Compass Heading if stationary
         if is_stationary:
             if self.navigation_filter in ("es_ekf", "15state") and self.fusion.es_ekf is not None:
                 self.fusion.es_ekf.update_zupt(sigma_v=0.01)
                 self.fusion.es_ekf.update_zaru(np.array([roll_rate, pitch_rate, yaw_rate]), sigma_bg=0.001)
-                psi_compass = float(np.deg2rad(90.0 - imu.orientation_yaw)) if (imu.orientation_yaw is not None and np.isfinite(imu.orientation_yaw)) else None
                 self.fusion.es_ekf.update_attitude(
-                    roll_rad=roll_rad if imu.orientation_roll is not None else None,
-                    pitch_rad=pitch_rad if imu.orientation_pitch is not None else None,
+                    roll_rad=0.0,
+                    pitch_rad=0.0,
                     yaw_rad=psi_compass,
                     sigma_att=0.04,
                 )
             else:
                 apply_zupt(self.fusion.ekf, sigma_v=0.01)
                 apply_zaru(self.fusion.ekf, gyro_z_raw=yaw_rate)
-                if imu.orientation_yaw is not None and np.isfinite(imu.orientation_yaw):
-                    psi_compass = float(np.deg2rad(90.0 - imu.orientation_yaw))
+                if psi_compass is not None:
                     self.fusion.ekf.update_heading(psi_compass, R_yaw=0.15)
 
         # 8. GNSS Freshness Check & Fusion Decision
@@ -560,15 +598,16 @@ class NavigationEngine:
                     self.blackspot_tracker.on_outage_start(cur_lat, cur_lon, timestamp=t)
 
             # Apply Non-Holonomic Constraints (NHC) with dynamic vehicle profile
-            vel_now = self.fusion.velocity_enu
-            sigma_lat, sigma_vert = self.current_profile.compute_nhc_sigmas(
-                yaw_rate=yaw_rate,
-                forward_speed=float(np.hypot(vel_now[0], vel_now[1])),
-            )
-            if self.navigation_filter in ("es_ekf", "15state") and self.fusion.es_ekf is not None:
-                self.fusion.es_ekf.update_nhc(sigma_lat=sigma_lat, sigma_vert=sigma_vert)
-            else:
-                apply_nhc_update(self.fusion.ekf, sigma_lat=sigma_lat, sigma_vert=sigma_vert)
+            if not is_stationary:
+                vel_now = self.fusion.velocity_enu
+                sigma_lat, sigma_vert = self.current_profile.compute_nhc_sigmas(
+                    yaw_rate=yaw_rate,
+                    forward_speed=float(np.hypot(vel_now[0], vel_now[1])),
+                )
+                if self.navigation_filter in ("es_ekf", "15state") and self.fusion.es_ekf is not None:
+                    self.fusion.es_ekf.update_nhc(sigma_lat=sigma_lat, sigma_vert=sigma_vert)
+                else:
+                    apply_nhc_update(self.fusion.ekf, sigma_lat=sigma_lat, sigma_vert=sigma_vert)
 
             # Apply AI Velocity pseudo-measurement update
             if self.has_new_ai_estimate and np.isfinite(self.latest_ai_speed) and self.latest_ai_speed >= 0.0:
@@ -597,8 +636,11 @@ class NavigationEngine:
 
             # Track DR distance and Blackspot analytics
             pos_now = self.fusion.position_enu
-            delta_dr = float(np.linalg.norm(pos_now[:2] - self.prev_dr_pos_enu))
-            self.total_dr_distance += delta_dr
+            if not is_stationary:
+                delta_dr = float(np.linalg.norm(pos_now[:2] - self.prev_dr_pos_enu))
+                self.total_dr_distance += delta_dr
+            else:
+                delta_dr = 0.0
             self.prev_dr_pos_enu = pos_now[:2].copy()
             
             pos_unc = self.fusion.pos_uncertainty_m
@@ -680,6 +722,58 @@ class NavigationEngine:
         compass_heading = (90.0 - psi_deg) % 360.0
         pos_unc_1s = self.fusion.pos_uncertainty_m
 
+        # Assemble comprehensive live forensic trace dictionary
+        R_p2v = self.aligner.R_phone_to_vehicle
+        es_ekf = self.fusion.es_ekf
+        q_now = es_ekf.q if es_ekf is not None else np.array([1.0, 0.0, 0.0, 0.0])
+        rpy_now = es_ekf.euler_angles if es_ekf is not None else (0.0, 0.0, float(yaw_final))
+        ba_now = es_ekf.ba if es_ekf is not None else np.zeros(3)
+        bg_now = es_ekf.bg if es_ekf is not None else np.zeros(3)
+        vel_unc = float(np.sqrt(np.trace(es_ekf.P[3:6, 3:6]))) if es_ekf is not None else 0.5
+
+        last_diag = getattr(es_ekf, 'last_update_diagnostics', {}) if es_ekf is not None else {}
+        nhc_innov = last_diag.get("innovation", [0.0, 0.0]) if last_diag.get("measurement") == "nhc" else [0.0, 0.0]
+        nhc_innov_arr = np.atleast_1d(nhc_innov)
+
+        forensics_payload = {
+            "prev_timestamp": prev_t,
+            "actual_dt_used": step_dt,
+            "dt": step_dt,
+            "dt_source": dt_source,
+            "is_out_of_order": is_out_of_order,
+            "is_absolute": is_verified_absolute,
+            "orientation_event_type": str(getattr(imu, 'orientation_event_type', '')),
+            "R_p2v": R_p2v.tolist() if isinstance(R_p2v, np.ndarray) else R_p2v,
+            "alignment_recalculated": bool(self.aligner.is_calibrated),
+            "acc_veh": [fwd_accel, lat_accel, vert_accel],
+            "gyro_veh": [roll_rate, pitch_rate, yaw_rate],
+            "linear_acc": dyn_acc_body.tolist() if isinstance(dyn_acc_body, np.ndarray) else list(dyn_acc_body),
+            "acc_magnitude": float(np.linalg.norm(acc_raw)),
+            "stationary_variance": float(getattr(self.stationary_detector, 'latest_var', 0.0)),
+            "ai_window_sample_count": len(self.ai_resampler.ai_window_buffer),
+            "ai_input_scaling_status": "raw_m_s2",
+            "ai_confidence_sigma": float(self.last_ai_sigma),
+            "ai_innovation": float(np.atleast_1d(self.last_ai_update_metrics.get("innovation", 0.0))[0]) if (self.last_ai_update_metrics and "innovation" in self.last_ai_update_metrics) else None,
+            "ai_accepted": bool(self.last_ai_update_metrics.get("accepted", False)) if self.last_ai_update_metrics else False,
+            "ekf_pos_enu": [float(pos_final[0]), float(pos_final[1]), float(pos_final[2])],
+            "ekf_vel_enu": [float(vel_final[0]), float(vel_final[1]), float(vel_final[2])],
+            "quat": [float(q_now[0]), float(q_now[1]), float(q_now[2]), float(q_now[3])],
+            "ekf_rpy_rad": [float(rpy_now[0]), float(rpy_now[1]), float(rpy_now[2])],
+            "bias_acc": [float(ba_now[0]), float(ba_now[1]), float(ba_now[2])],
+            "bias_gyro": [float(bg_now[0]), float(bg_now[1]), float(bg_now[2])],
+            "vel_uncertainty_1sigma_mps": vel_unc,
+            "pos_uncertainty_1sigma_m": float(pos_unc_1s),
+            "nhc_active": bool(not effective_gnss_valid and not is_stationary),
+            "nhc_residual_lat": float(nhc_innov_arr[0]) if len(nhc_innov_arr) > 0 else 0.0,
+            "nhc_residual_vert": float(nhc_innov_arr[1]) if len(nhc_innov_arr) > 1 else 0.0,
+            "nhc_accepted": bool(last_diag.get("accepted", False)) if last_diag.get("measurement") == "nhc" else False,
+            "attitude_update_accepted": bool(last_diag.get("accepted", False)) if last_diag.get("measurement") == "attitude_3d" else False,
+            "gnss_vel_update_accepted": bool(last_diag.get("accepted", False)) if last_diag.get("measurement") == "gnss_vel" else False,
+            "self_healing_reanchored": bool(last_diag.get("reanchored", False)) if last_diag.get("measurement") == "ai_velocity" else False,
+            "fwd_speed_kmh": round(cur_fwd_speed * 3.6, 2),
+            "trajectory_point_accepted": True,
+        }
+
         return NavigationOutputState(
             timestamp=t,
             latitude=float(lat_out),
@@ -701,6 +795,7 @@ class NavigationEngine:
             diagnostics=diagnostics,
             active_blackspot_id=self.blackspot_tracker.active_outage.id if self.blackspot_tracker.active_outage else None,
             active_crash_alert=crash_alert,
+            forensics=forensics_payload,
         )
 
     def reset(self, ref_lat: Optional[float] = None, ref_lon: Optional[float] = None):

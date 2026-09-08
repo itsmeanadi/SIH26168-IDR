@@ -147,6 +147,22 @@ class ExperimentRecorder:
         marker_to_log = self._last_event_marker
         self._last_event_marker = None  # Consume single-frame marker
 
+        f = getattr(nav_state, 'forensics', None) or {}
+        acc_v = f.get("acc_veh", [float(imu.acc_x), float(imu.acc_y), float(imu.acc_z)])
+        gyro_v = f.get("gyro_veh", [float(imu.gyro_x), float(imu.gyro_y), float(imu.gyro_z)])
+        R_p2v = f.get("R_p2v", [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
+        r_mat = np.array(R_p2v, dtype=np.float64) if isinstance(R_p2v, (list, np.ndarray)) else np.eye(3)
+        if r_mat.shape != (3, 3):
+            r_mat = np.eye(3)
+
+        linear_acc = f.get("linear_acc", [0.0, 0.0, 0.0])
+        quat = f.get("quat", [1.0, 0.0, 0.0, 0.0])
+        rpy_rad = f.get("ekf_rpy_rad", [0.0, 0.0, np.deg2rad(nav_state.heading_deg)])
+        ba = f.get("bias_acc", [0.0, 0.0, 0.0])
+        bg = f.get("bias_gyro", [0.0, 0.0, 0.0])
+        pos_enu = f.get("ekf_pos_enu", [0.0, 0.0, float(nav_state.altitude)])
+        vel_enu = f.get("ekf_vel_enu", [float(nav_state.velocity_east), float(nav_state.velocity_north), 0.0])
+
         record = TelemetryRecord(
             timestamp=t,
             wall_time=now_iso,
@@ -160,19 +176,51 @@ class ExperimentRecorder:
             mag_x=imu.mag_x,
             mag_y=imu.mag_y,
             mag_z=imu.mag_z,
+            raw_alpha=getattr(imu, 'raw_alpha', None),
+            raw_beta=getattr(imu, 'raw_beta', None),
+            raw_gamma=getattr(imu, 'raw_gamma', None),
+            is_absolute=getattr(imu, 'is_absolute', None),
+            has_webkit_heading=getattr(imu, 'has_webkit_heading', None),
+            webkit_compass_heading=getattr(imu, 'webkit_compass_heading', None),
+            orientation_event_type=getattr(imu, 'orientation_event_type', None),
+            screen_orientation_angle=getattr(imu, 'screen_orientation_angle', None),
+            server_receive_time=getattr(imu, 'server_receive_time', None),
             orientation_yaw=imu.orientation_yaw,
             orientation_pitch=imu.orientation_pitch,
             orientation_roll=imu.orientation_roll,
-            # Calibrated Vehicle Frame
-            acc_veh_x=float(imu.acc_x),
-            acc_veh_y=float(imu.acc_y),
-            acc_veh_z=float(imu.acc_z),
-            gyro_veh_x=float(imu.gyro_x),
-            gyro_veh_y=float(imu.gyro_y),
-            gyro_veh_z=float(imu.gyro_z),
-            # Calibration State
+            # Timing
+            prev_timestamp=f.get("prev_timestamp"),
+            actual_dt_used=float(f.get("actual_dt_used", 0.1)),
+            dt_source=str(f.get("dt_source", "nominal")),
+            is_out_of_order=bool(f.get("is_out_of_order", False)),
+            # Calibrated Vehicle Frame & Alignment
+            acc_veh_x=float(acc_v[0]),
+            acc_veh_y=float(acc_v[1]),
+            acc_veh_z=float(acc_v[2]),
+            gyro_veh_x=float(gyro_v[0]),
+            gyro_veh_y=float(gyro_v[1]),
+            gyro_veh_z=float(gyro_v[2]),
             calibration_state=calib_state,
             is_calibrated=nav_state.is_aligned,
+            alignment_recalculated=bool(f.get("alignment_recalculated", nav_state.is_aligned)),
+            R_p2v_00=float(r_mat[0, 0]),
+            R_p2v_01=float(r_mat[0, 1]),
+            R_p2v_02=float(r_mat[0, 2]),
+            R_p2v_10=float(r_mat[1, 0]),
+            R_p2v_11=float(r_mat[1, 1]),
+            R_p2v_12=float(r_mat[1, 2]),
+            R_p2v_20=float(r_mat[2, 0]),
+            R_p2v_21=float(r_mat[2, 1]),
+            R_p2v_22=float(r_mat[2, 2]),
+            # Motion & Stationary
+            linear_acc_x=float(linear_acc[0]),
+            linear_acc_y=float(linear_acc[1]),
+            linear_acc_z=float(linear_acc[2]),
+            acc_magnitude=float(f.get("acc_magnitude", np.linalg.norm([imu.acc_x, imu.acc_y, imu.acc_z]))),
+            is_stationary=nav_state.is_stationary,
+            stationary_variance=float(f.get("stationary_variance", 0.0)),
+            zupt_active=nav_state.is_stationary,
+            zaru_active=nav_state.is_stationary,
             # GNSS
             has_new_gnss=has_new_gnss,
             gnss_lat=gnss.latitude if gnss else None,
@@ -181,31 +229,61 @@ class ExperimentRecorder:
             gnss_speed_mps=gnss.speed_mps if gnss else None,
             gnss_heading_deg=gnss.heading_deg if gnss else None,
             gnss_accuracy_m=gnss.accuracy_m if gnss else None,
+            gnss_timestamp=gnss.timestamp if gnss else None,
             gnss_age_sec=gnss_age,
             gnss_trust_score=float(nav_state.gnss_trust_score),
             gnss_trust_status=nav_state.gnss_status,
             gnss_is_trusted=(nav_state.gnss_trust_score > 0.7),
             # AI
+            ai_window_sample_count=int(f.get("ai_window_sample_count", 0)),
+            ai_input_scaling_status=str(f.get("ai_input_scaling_status", "raw_m_s2")),
             ai_speed_mps=ai_speed,
-            ai_is_ready=True if ai_speed > 0.01 else False,
+            ai_is_ready=bool(f.get("ai_is_ready", ai_speed > 0.01)),
             ai_has_new_inference=ai_has_new,
-            # EKF State
+            ai_confidence_sigma=float(f.get("ai_confidence_sigma", 3.0)),
+            ai_innovation=f.get("ai_innovation"),
+            ai_accepted=bool(f.get("ai_accepted", False)),
+            # ES-EKF States
             ekf_lat=float(nav_state.latitude),
             ekf_lon=float(nav_state.longitude),
-            ekf_east_m=0.0,
-            ekf_north_m=0.0,
-            ekf_vel_east_mps=float(nav_state.velocity_east),
-            ekf_vel_north_mps=float(nav_state.velocity_north),
+            ekf_east_m=float(pos_enu[0]),
+            ekf_north_m=float(pos_enu[1]),
+            ekf_up_m=float(pos_enu[2]),
+            ekf_vel_east_mps=float(vel_enu[0]),
+            ekf_vel_north_mps=float(vel_enu[1]),
+            ekf_vel_up_mps=float(vel_enu[2]),
             ekf_fwd_speed_mps=float(nav_state.forward_speed_mps),
+            fwd_speed_kmh=float(f.get("fwd_speed_kmh", nav_state.forward_speed_mps * 3.6)),
+            quat_w=float(quat[0]),
+            quat_x=float(quat[1]),
+            quat_y=float(quat[2]),
+            quat_z=float(quat[3]),
+            ekf_roll_deg=float(np.rad2deg(rpy_rad[0])),
+            ekf_pitch_deg=float(np.rad2deg(rpy_rad[1])),
+            ekf_yaw_deg=float(np.rad2deg(rpy_rad[2])),
             heading_deg=float(nav_state.heading_deg),
+            heading_rad=float(nav_state.heading_rad),
             lean_angle_deg=float(nav_state.lean_angle_deg),
+            bias_acc_x=float(ba[0]),
+            bias_acc_y=float(ba[1]),
+            bias_acc_z=float(ba[2]),
+            bias_gyro_x=float(bg[0]),
+            bias_gyro_y=float(bg[1]),
+            bias_gyro_z=float(bg[2]),
+            pos_uncertainty_1sigma_m=float(f.get("pos_uncertainty_1sigma_m", nav_state.pos_uncertainty_m)),
+            vel_uncertainty_1sigma_mps=float(f.get("vel_uncertainty_1sigma_mps", 0.5)),
+            nhc_active=bool(f.get("nhc_active", nav_state.is_in_blackout and not nav_state.is_stationary)),
+            nhc_residual_lat=float(f.get("nhc_residual_lat", 0.0)),
+            nhc_residual_vert=float(f.get("nhc_residual_vert", 0.0)),
+            nhc_accepted=bool(f.get("nhc_accepted", False)),
+            gnss_vel_update_accepted=bool(f.get("gnss_vel_update_accepted", False)),
+            attitude_update_accepted=bool(f.get("attitude_update_accepted", False)),
+            self_healing_reanchored=bool(f.get("self_healing_reanchored", False)),
+            # Navigation Output
             nav_mode=nav_state.nav_mode.value if hasattr(nav_state.nav_mode, 'value') else str(nav_state.nav_mode),
             is_in_blackout=nav_state.is_in_blackout,
-            is_stationary=nav_state.is_stationary,
-            nhc_active=nav_state.is_in_blackout and not nav_state.is_stationary,
-            zupt_active=nav_state.is_stationary,
-            zaru_active=nav_state.is_stationary,
             total_dr_distance_m=total_dr,
+            trajectory_point_accepted=bool(f.get("trajectory_point_accepted", True)),
             step_latency_ms=step_latency_ms,
             event_marker=marker_to_log,
         )

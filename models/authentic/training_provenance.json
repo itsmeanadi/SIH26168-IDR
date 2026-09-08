@@ -1,23 +1,27 @@
 {
-  "model_name": "VelocityEstimatorNet + IMUDenoiseNet",
-  "dataset_name": "authentic-iovnbd",
-  "authenticity": "authentic",
+  "model_name": "VelocityEstimatorNet",
+  "authenticity": "authentic_iovnbd",
   "is_scientific_research_valid": true,
-  "allow_synthetic_flag": false,
-  "train_drives": [
-    "S",
-    "Vf",
-    "Vta",
-    "Vtb",
-    "Vw"
+  "checkpoint_sha256": "ef1f004f77e18223e5524932435083ec70fa1be27db981b3ba170e8245110b87",
+  "onnx_sha256": "b8ef925b23c2e580d1317e270f8e292b53d35bb8123a2c2b38b72e1eb6242354",
+  "dataset_name": "authentic-iovnbd",
+  "split_policy": "driver_disjoint",
+  "train_drivers": [
+    "Driver E",
+    "Driver A"
   ],
-  "val_drives": [
-    "M"
+  "val_driver": [
+    "Driver B"
+  ],
+  "test_driver": [
+    "Driver D"
   ],
   "num_train_samples": 88218,
   "num_val_samples": 10581,
+  "num_test_samples": 7012,
+  "best_epoch": 8,
+  "best_val_mae_mps": 2.1381,
   "epochs_trained": 25,
-  "timestamp_utc": "2026-09-07T20:32:47.042018+00:00",
-  "git_commit": null,
-  "notes": "Authentic research training (Driver-Disjoint split)"
+  "timestamp_utc": "2026-09-08T21:35:46Z",
+  "notes": "Authentic training on IO-VNBD Driver-Disjoint split with stationary gate supervision"
 }

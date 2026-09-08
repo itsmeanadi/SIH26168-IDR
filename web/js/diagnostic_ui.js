@@ -139,7 +139,16 @@ class IDRDiagnosticUI {
 
     if (this.diagSrcTrajectoryEl) {
       if (this.currentMode === 'live') {
-        this.diagSrcTrajectoryEl.textContent = state.is_in_blackout ? 'ES-EKF Dead Reckoning (SERVER_DERIVED)' : 'Live Geodetic GNSS Fixes (REAL_DEVICE)';
+        const mode = String(state.nav_mode || '');
+        if (state.gnss_status === 'TRUSTED' && mode.includes('GNSS')) {
+          this.diagSrcTrajectoryEl.textContent = 'Live Geodetic GNSS Fixes (REAL_DEVICE)';
+        } else if (mode.includes('AI')) {
+          this.diagSrcTrajectoryEl.textContent = '15-State ES-EKF + AI Dead Reckoning (SERVER_DERIVED)';
+        } else if (mode.includes('ZUPT') || state.is_stationary) {
+          this.diagSrcTrajectoryEl.textContent = 'Stationary Anchor (ZUPT)';
+        } else {
+          this.diagSrcTrajectoryEl.textContent = 'ES-EKF Dead Reckoning (SERVER_DERIVED)';
+        }
       } else if (this.currentMode === 'replay') {
         this.diagSrcTrajectoryEl.textContent = 'IO-VNBD Trajectory (REPLAY)';
       } else {
@@ -179,18 +188,21 @@ class IDRDiagnosticUI {
 
     // 4. Navigation Mode Pill
     const isInBlackout = Boolean(state.is_in_blackout);
-    const navMode = String(state.nav_mode || (isInBlackout ? 'DEAD_RECKONING_NHC_AI' : 'GNSS_INS_FULL'));
+    const navMode = String(state.nav_mode || (isInBlackout ? 'DEAD_RECKONING_NHC_AI' : 'DEAD_RECKONING_PURE'));
 
     if (this.modePillEl && this.modeTextEl) {
-      if (isInBlackout) {
+      if (isInBlackout || navMode.startsWith('DEAD_RECKONING') || navMode === 'STATIONARY_ZUPT') {
         this.modePillEl.className = 'nav-status-pill mode-dr';
-        this.modeTextEl.textContent = 'Dead Reckoning Active';
+        this.modeTextEl.textContent = navMode === 'STATIONARY_ZUPT' ? 'Stationary Anchor (ZUPT)' : 'Dead Reckoning Active';
       } else if (navMode.includes('REACQUISITION')) {
         this.modePillEl.className = 'nav-status-pill mode-reacq';
         this.modeTextEl.textContent = 'Reacquiring Position';
-      } else {
+      } else if (navMode.includes('GNSS')) {
         this.modePillEl.className = 'nav-status-pill mode-gnss';
         this.modeTextEl.textContent = 'GNSS Active';
+      } else {
+        this.modePillEl.className = 'nav-status-pill mode-dr';
+        this.modeTextEl.textContent = 'Dead Reckoning Active';
       }
     }
 

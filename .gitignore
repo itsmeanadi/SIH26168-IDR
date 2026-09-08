@@ -16,14 +16,18 @@ venv/
 .venv/
 env/
 
-# Data (large files - never commit)
-data/
-recordings/
-scratch/
+# Data (large files - never commit root data directory or temporary recordings)
+/data/
+/recordings/
+/scratch/
 *.csv
 *.zip
 *.pbf
 *.graphml
+!src/idr/data/
+!src/idr/data/**
+src/idr/data/__pycache__/
+src/idr/data/**/*.pyc
 
 # Model checkpoints (keep root/temp ignored, track committed weights in models/)
 *.pt

@@ -91,11 +91,11 @@ def test_gravity_compensation_under_phone_tilt():
     roll_deg = 10.0
     p_rad = np.radians(pitch_deg)
     r_rad = np.radians(roll_deg)
-    # Specific force measured by tilted accelerometer:
-    # ax = +g * sin(r) * cos(p), ay = -g * sin(p), az = +g * cos(p) * cos(r)
+    # Specific force measured by tilted accelerometer (W3C DeviceOrientation):
+    # ax = -g * sin(r) * cos(p), ay = +g * sin(p), az = +g * cos(p) * cos(r)
     g = 9.80665
-    ax = float(g * np.sin(r_rad) * np.cos(p_rad))
-    ay = float(-g * np.sin(p_rad))
+    ax = float(-g * np.sin(r_rad) * np.cos(p_rad))
+    ay = float(g * np.sin(p_rad))
     az = float(g * np.cos(p_rad) * np.cos(r_rad))
 
     for i in range(50):
