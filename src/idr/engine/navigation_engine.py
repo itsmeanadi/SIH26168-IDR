@@ -613,18 +613,28 @@ class NavigationEngine:
             if self.has_new_ai_estimate and np.isfinite(self.latest_ai_speed) and self.latest_ai_speed >= 0.0:
                 self.ai_update_count += 1
                 if self.navigation_filter in ("es_ekf", "15state") and self.fusion.es_ekf is not None:
+                    # AI velocity update gate: relax if we are in a prolonged blackout
+                    # and the EKF is potentially drifted (indicated by repeated rejections).
+                    ai_gate = 3.0
+                    if not effective_gnss_valid and self.ai_rejected_count > 10:
+                        ai_gate = 10.0
+
                     accepted, metrics = self.fusion.es_ekf.update_ai_velocity(
                         self.latest_ai_speed,
                         sigma_v=self.last_ai_sigma,
-                        max_innovation_sigma=3.0,
+                        max_innovation_sigma=ai_gate,
                         min_sigma_v=1.0,
                         max_sigma_v=10.0,
                     )
                 else:
+                    ai_gate = 3.0
+                    if not effective_gnss_valid and self.ai_rejected_count > 10:
+                        ai_gate = 10.0
+
                     accepted, metrics = self.fusion.ekf.update_ai_velocity(
                         self.latest_ai_speed,
                         sigma_v=self.last_ai_sigma,
-                        max_innovation_sigma=3.0,
+                        max_innovation_sigma=ai_gate,
                         min_sigma_v=1.0,
                         max_sigma_v=10.0,
                     )
