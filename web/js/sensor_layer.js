@@ -60,6 +60,9 @@ class MobileSensorLayer {
 
     this._lastEventTimestamp = 0;
 
+    // Android Native Bridge Integration
+    this._setupAndroidBridge();
+
     // Bind event handlers
     this._handleMotion = this._handleMotion.bind(this);
     this._handleOrientation = this._handleOrientation.bind(this);
@@ -211,6 +214,11 @@ class MobileSensorLayer {
     }
   }
 
+  // Helper to check if native bridge is active
+  isAndroidBridgeActive() {
+    return typeof window !== 'undefined' && window.onAndroidSensorUpdate !== undefined;
+  }
+
   stop() {
     this.isActive = false;
     if (typeof window !== 'undefined') {
@@ -239,6 +247,72 @@ class MobileSensorLayer {
     this.telemetry.gnss.rateHz = 0;
 
     this._emitTelemetry();
+  }
+
+  _setupAndroidBridge() {
+    window.onAndroidSensorUpdate = (data) => {
+      if (!this.isActive) return;
+
+      const epochSec = data.timestamp / 1000.0;
+      this.telemetry.lastEventEpochSec = epochSec;
+
+      // 1. Update IMU
+      const imu = data.imu;
+      this.latestImu.acc_x = imu.acc_x;
+      this.latestImu.acc_y = imu.acc_y;
+      this.latestImu.acc_z = imu.acc_z;
+      this.latestImu.gyro_x = imu.gyro_x;
+      this.latestImu.gyro_y = imu.gyro_y;
+      this.latestImu.gyro_z = imu.gyro_z;
+      this.latestImu.mag_x = imu.mag_x;
+      this.latestImu.mag_y = imu.mag_y;
+      this.latestImu.mag_z = imu.mag_z;
+
+      this.telemetry.accel.hasData = true;
+      this.telemetry.accel.status = 'ACTIVE';
+      this.telemetry.accel.count++;
+      this.telemetry.accel.lastTimestamp = epochSec;
+      this.telemetry.accel.raw = [imu.acc_x, imu.acc_y, imu.acc_z];
+
+      this.telemetry.gyro.hasData = true;
+      this.telemetry.gyro.status = 'ACTIVE';
+      this.telemetry.gyro.count++;
+      this.telemetry.gyro.lastTimestamp = epochSec;
+      this.telemetry.gyro.raw = [imu.gyro_x, imu.gyro_y, imu.gyro_z];
+
+      // 2. Update GNSS
+      const gps = data.gps;
+      if (gps && gps.lat !== 0) {
+        this.latestGnss = {
+          timestamp: epochSec,
+          latitude: gps.lat,
+          longitude: gps.lon,
+          altitude: gps.alt || 0.0,
+          accuracy_m: gps.accuracy || 3.0,
+          speed_mps: null, // Native bridge doesn't provide speed in current impl
+          heading_deg: null,
+        };
+        this.telemetry.gnss.hasData = true;
+        this.telemetry.gnss.status = 'FIX';
+        this.telemetry.gnss.count++;
+        this.telemetry.gnss.lastTimestamp = epochSec;
+        this.telemetry.gnss.accuracy_m = gps.accuracy;
+      }
+
+      this.telemetry.totalSamplesReceived++;
+
+      // Throttled frame emission (target 50 Hz)
+      const tNow = performance.now();
+      if (tNow - this.lastImuTime >= this.minIntervalMs) {
+        this.lastImuTime = tNow;
+        if (this.onFrameCallback) {
+          this.onFrameCallback({
+            imu: { ...this.latestImu, timestamp: epochSec },
+            gnss: this.latestGnss ? { ...this.latestGnss } : null,
+          });
+        }
+      }
+    };
   }
 
   _handleMotion(event) {

@@ -803,9 +803,9 @@ class NavigationEngine:
         if ref_lat is not None and ref_lon is not None:
             self.ref_lat = float(ref_lat)
             self.ref_lon = float(ref_lon)
-            self.has_gps_anchor = True
-        else:
-            self.has_gps_anchor = False
+
+        # Always start unanchored so the first real GPS fix sets the origin
+        self.has_gps_anchor = False
         self.has_physical_gps_fix = False
         self.fusion = GNSSINSFusion(
             ref_lat=self.ref_lat,
