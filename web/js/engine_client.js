@@ -4,8 +4,8 @@
  */
 
 const BACKEND_CONFIG = {
-  LOCAL: 'http://10.89.225.17:8000',
-  RENDER: 'https://sih26168-idr-3.onrender.com'
+  RENDER: 'https://sih26168-idr-3.onrender.com',
+  EMULATOR: 'http://10.0.2.2:8000',
 };
 
 class IDREngineClient {
@@ -18,7 +18,7 @@ class IDREngineClient {
     this.onStatusChangeCallback = null;
     this.reconnectIntervalMs = 2000;
     this._reconnectTimer = null;
-    this.currentBackend = 'UNKNOWN'; // 'LOCAL' | 'RENDER'
+    this.currentBackend = 'UNKNOWN'; // 'ORIGIN' | 'CUSTOM' | 'EMULATOR' | 'RENDER'
   }
 
   _deriveWsUrl(url) {
@@ -29,25 +29,75 @@ class IDREngineClient {
     this.onStateCallback = onState;
     this.onStatusChangeCallback = onStatusChange;
 
-    // 1. Try Local first
-    if (await this._verifyBackend(BACKEND_CONFIG.LOCAL)) {
-      this._setBackend(BACKEND_CONFIG.LOCAL, 'LOCAL');
-    }
-    // 2. Fallback to Render
-    else if (await this._verifyBackend(BACKEND_CONFIG.RENDER)) {
-      this._setBackend(BACKEND_CONFIG.RENDER, 'RENDER');
-    }
-    // 3. Final fallback to current origin
-    else {
-      this._setBackend(window.location.origin, 'UNKNOWN');
+    const candidates = this._getBackendCandidates();
+
+    for (const cand of candidates) {
+      if (cand.url && await this._verifyBackend(cand.url)) {
+        this._setBackend(cand.url, cand.name);
+        this._establishWebSocket();
+        return;
+      }
     }
 
+    // Default fallback to current origin or render
+    const fallbackUrl = (window.location.origin && window.location.origin.startsWith('http')) 
+      ? window.location.origin 
+      : BACKEND_CONFIG.RENDER;
+    this._setBackend(fallbackUrl, 'FALLBACK');
     this._establishWebSocket();
+  }
+
+  _getBackendCandidates() {
+    const list = [];
+
+    // 1. URL Query Parameter ?backend=...
+    if (typeof window !== 'undefined' && window.location && window.location.search) {
+      const params = new URLSearchParams(window.location.search);
+      const qBackend = params.get('backend');
+      if (qBackend) {
+        list.push({ url: qBackend.replace(/\/$/, ''), name: 'QUERY_OVERRIDE' });
+      }
+    }
+
+    // 2. Android Native Bridge saved URL if present
+    if (typeof window !== 'undefined' && window.AndroidConfig && typeof window.AndroidConfig.getBackendUrl === 'function') {
+      try {
+        const androidUrl = window.AndroidConfig.getBackendUrl();
+        if (androidUrl) list.push({ url: androidUrl.replace(/\/$/, ''), name: 'ANDROID_CONFIG' });
+      } catch (e) {}
+    }
+
+    // 3. LocalStorage custom backend
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const localCustom = localStorage.getItem('idr_backend_url');
+        if (localCustom) list.push({ url: localCustom.replace(/\/$/, ''), name: 'CUSTOM' });
+      } catch (e) {}
+    }
+
+    // 4. Current Window Origin (Host that served the PWA / Local IP)
+    if (typeof window !== 'undefined' && window.location && window.location.origin && window.location.origin.startsWith('http')) {
+      const origin = window.location.origin.replace(/\/$/, '');
+      if (!list.some(c => c.url === origin)) {
+        list.push({ url: origin, name: 'ORIGIN' });
+      }
+    }
+
+    // 5. Android Emulator loopback
+    if (!list.some(c => c.url === BACKEND_CONFIG.EMULATOR)) {
+      list.push({ url: BACKEND_CONFIG.EMULATOR, name: 'EMULATOR' });
+    }
+
+    // 6. Cloud Production Render
+    if (!list.some(c => c.url === BACKEND_CONFIG.RENDER)) {
+      list.push({ url: BACKEND_CONFIG.RENDER, name: 'RENDER' });
+    }
+
+    return list;
   }
 
   async _verifyBackend(url) {
     try {
-      // Use a short timeout for connectivity check
       const controller = new AbortController();
       const id = setTimeout(() => controller.abort(), 1500);
 

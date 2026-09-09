@@ -494,30 +494,6 @@ class IDRApp {
     }
   }
 
-  async _handleStartLiveNavigation() {
-    try {
-      await this.client.controlReplay('pause');
-      await this.client.resetNavigation();
-      this.map.resetPaths();
-
-      // Attempt sensor initialization
-      const started = await this.sensors.start();
-      const isSec = this.sensors.telemetry.isSecureContext;
-
-      if (started) {
-        this.isPhoneSensorsActive = true;
-        this.switchScreen('nav');
-        this.setProvenance('live');
-      } else {
-        // Sensors could not start (permission denied or insecure context)
-        this._showSensorReadinessModal(isSec);
-      }
-    } catch (err) {
-      console.error('[IDR] Error starting live navigation:', err);
-      this._showSensorReadinessModal(false);
-    }
-  }
-
   _showSensorReadinessModal(isSecure) {
     if (!this.readinessModal) return;
 

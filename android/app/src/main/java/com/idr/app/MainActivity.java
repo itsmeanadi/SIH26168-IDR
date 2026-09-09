@@ -2,8 +2,12 @@ package com.idr.app;
 
 import android.Manifest;
 import android.app.Activity;
+import android.content.Context;
+import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.webkit.JavascriptInterface;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -12,6 +16,8 @@ import androidx.core.content.ContextCompat;
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -20,13 +26,18 @@ public class MainActivity extends Activity {
     private SensorBridge sensorBridge;
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
-    private final String LOCAL_URL = "http://10.89.225.17:8000";
-    private final String RENDER_URL = "https://sih26168-idr-3.onrender.com";
+    private static final String PREFS_NAME = "IDR_PREFERENCES";
+    private static final String KEY_CUSTOM_URL = "custom_backend_url";
+    private static final String RENDER_URL = "https://sih26168-idr-3.onrender.com";
+    private static final String EMULATOR_URL = "http://10.0.2.2:8000";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        // Check if intent contains backend override
+        handleIntentOverrides(getIntent());
 
         webView = findViewById(R.id.webView);
         configureWebView();
@@ -35,17 +46,39 @@ public class MainActivity extends Activity {
 
         requestPermissions();
 
-        // Default immediately to Render or Local while checking in background
-        webView.loadUrl(RENDER_URL);
+        // Load saved URL or fallback to Render immediately while probing in background
+        String initialUrl = getSavedBackendUrl();
+        webView.loadUrl(initialUrl != null ? initialUrl : RENDER_URL);
 
-        // Check backend availability asynchronously without blocking the UI thread
+        // Check backend candidates asynchronously without blocking UI thread
         determineBackendAsync(url -> {
             runOnUiThread(() -> {
-                if (webView != null && !url.equals(RENDER_URL)) {
+                if (webView != null && (initialUrl == null || !initialUrl.equals(url))) {
+                    saveBackendUrl(url);
                     webView.loadUrl(url);
                 }
             });
         });
+    }
+
+    private void handleIntentOverrides(Intent intent) {
+        if (intent != null) {
+            String overrideUrl = intent.getStringExtra("BACKEND_URL");
+            if (overrideUrl == null) overrideUrl = intent.getStringExtra("SERVER_URL");
+            if (overrideUrl != null && !overrideUrl.trim().isEmpty()) {
+                saveBackendUrl(overrideUrl.trim());
+            }
+        }
+    }
+
+    private String getSavedBackendUrl() {
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        return prefs.getString(KEY_CUSTOM_URL, null);
+    }
+
+    private void saveBackendUrl(String url) {
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        prefs.edit().putString(KEY_CUSTOM_URL, url).apply();
     }
 
     interface BackendCallback {
@@ -54,13 +87,25 @@ public class MainActivity extends Activity {
 
     private void determineBackendAsync(BackendCallback callback) {
         executor.execute(() -> {
-            if (isBackendAvailable(LOCAL_URL)) {
-                callback.onResult(LOCAL_URL);
-            } else if (isBackendAvailable(RENDER_URL)) {
-                callback.onResult(RENDER_URL);
-            } else {
-                callback.onResult(RENDER_URL);
+            List<String> candidates = new ArrayList<>();
+            String savedUrl = getSavedBackendUrl();
+            if (savedUrl != null && !savedUrl.trim().isEmpty() && !candidates.contains(savedUrl.trim())) {
+                candidates.add(savedUrl.trim());
             }
+            if (!candidates.contains(EMULATOR_URL)) {
+                candidates.add(EMULATOR_URL);
+            }
+            if (!candidates.contains(RENDER_URL)) {
+                candidates.add(RENDER_URL);
+            }
+
+            for (String candidate : candidates) {
+                if (isBackendAvailable(candidate)) {
+                    callback.onResult(candidate);
+                    return;
+                }
+            }
+            callback.onResult(RENDER_URL);
         });
     }
 
@@ -68,8 +113,8 @@ public class MainActivity extends Activity {
         try {
             URL url = new URL(urlString + "/api/system/health");
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-            connection.setConnectTimeout(2000);
-            connection.setReadTimeout(2000);
+            connection.setConnectTimeout(1500);
+            connection.setReadTimeout(1500);
             connection.setRequestMethod("GET");
             int responseCode = connection.getResponseCode();
             connection.disconnect();
@@ -86,6 +131,24 @@ public class MainActivity extends Activity {
         settings.setAllowFileAccess(true);
         settings.setAllowContentAccess(true);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+
+        // Expose bridge for runtime backend URL configuration from WebView
+        webView.addJavascriptInterface(new Object() {
+            @JavascriptInterface
+            public void setBackendUrl(String url) {
+                if (url != null && !url.trim().isEmpty()) {
+                    saveBackendUrl(url.trim());
+                    runOnUiThread(() -> {
+                        if (webView != null) webView.loadUrl(url.trim());
+                    });
+                }
+            }
+
+            @JavascriptInterface
+            public String getBackendUrl() {
+                return getSavedBackendUrl();
+            }
+        }, "AndroidConfig");
 
         webView.setWebViewClient(new WebViewClient());
     }
