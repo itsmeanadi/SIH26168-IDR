@@ -42,3 +42,4 @@ httpx>=0.27
 # ── Demo App (Legacy) ────────────────────────────────────
 streamlit>=1.36
 folium>=0.17
+cryptography
