@@ -709,6 +709,12 @@ class NavigationEngine:
         blackout_elapsed = (t - self.blackout_start_time) if self.blackout_start_time else 0.0
         blend_prog = min(1.0, self.reacquisition_smoother.blend_counter / self.reacquisition_smoother.total_blend_steps)
 
+        # VELDBG logging for velocity mismatch isolation
+        ai_vx = self.latest_ai_speed * np.cos(yaw_final) if np.isfinite(self.latest_ai_speed) else 0.0
+        ai_vy = self.latest_ai_speed * np.sin(yaw_final) if np.isfinite(self.latest_ai_speed) else 0.0
+        ai_innovation = float(np.atleast_1d(self.last_ai_update_metrics.get("innovation", 0.0))[0]) if (self.last_ai_update_metrics and "innovation" in self.last_ai_update_metrics) else 0.0
+        print(f"VELDBG,ts={t:.3f},dt={step_dt:.4f},ai_vx={ai_vx:.3f},ai_vy={ai_vy:.3f},ai_speed={self.latest_ai_speed:.3f},ekf_vx={vel_final[0]:.3f},ekf_vy={vel_final[1]:.3f},ekf_fwd_speed={cur_fwd_speed:.3f},innovation={ai_innovation:.3f},gate_sigma={self.last_ai_sigma:.2f},ai_accepted={bool(self.last_ai_update_metrics.get('accepted', False)) if self.last_ai_update_metrics else False},gnss_status={'active' if effective_gnss_valid else 'blackout'},dr_distance={self.total_dr_distance:.2f},mode={'live' if not self.is_gnss_denied_simulated else 'replay'}")
+
         cov_matrix = self.fusion.es_ekf.P if self.fusion.es_ekf is not None else self.fusion.ekf.P
 
         diagnostics = self.health_engine.compute_diagnostics(
