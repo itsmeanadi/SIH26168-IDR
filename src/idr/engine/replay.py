@@ -25,7 +25,10 @@ class DriveReplayer:
         self.drive_name = ""
 
     def load_iovnbd_drive(self, drive_name: str = "Vf", data_dir: str = "data/raw/categorised", reset_engine: bool = True) -> bool:
-        """Load an IO-VNBD categorized drive (e.g. Vf, M, S, Y1, Vta, Vtb, Vw)."""
+        """Load an IO-VNBD categorized drive (e.g. Vf, M, S, Y1, Vta, Vtb, Vw) or walking demo."""
+        if drive_name == "walking":
+            return self._generate_walking_drive(reset_engine=reset_engine)
+
         s_path = os.path.join(data_dir, drive_name, f"S-{drive_name}.csv")
         v_path = os.path.join(data_dir, drive_name, f"V-{drive_name}.csv")
 
@@ -282,3 +285,72 @@ class DriveReplayer:
             "is_playing": self.is_playing,
             "playback_speed": self.playback_speed,
         }
+
+    def _generate_walking_drive(self, reset_engine: bool = True) -> bool:
+        """Generate a physics-consistent walking session (human pace ~1.3 m/s) with turns and a blackout."""
+        self.drive_name = "Walking Demo (Synthetic)"
+        self.data_frames = []
+        ref_lat, ref_lon = 28.6139, 77.2090
+        if reset_engine:
+            self.engine.reset(ref_lat=ref_lat, ref_lon=ref_lon)
+
+        dt = 0.1
+        total_steps = 1000  # 100 seconds
+        cur_east, cur_north = 0.0, 0.0
+        cur_yaw = 0.0
+        cur_speed = 0.0
+
+        for k in range(total_steps):
+            t = k * dt
+
+            # Walking profile: accelerate to walk -> walk straight -> turn -> blackout -> stop
+            if k < 100:
+                acc = 0.2  # Slow accelerate
+                yaw_rate = 0.0
+            elif k < 400:
+                acc = 0.0
+                yaw_rate = 0.0
+            elif k < 600:
+                acc = 0.0
+                yaw_rate = float(np.deg2rad(10.0)) # Slow turn
+            elif k < 800:
+                acc = 0.0
+                yaw_rate = 0.0
+            else:
+                acc = -0.1
+                yaw_rate = 0.0
+
+            cur_speed = max(0.0, cur_speed + acc * dt)
+            cur_yaw = (cur_yaw + yaw_rate * dt + np.pi) % (2 * np.pi) - np.pi
+            cur_east += cur_speed * np.cos(cur_yaw) * dt
+            cur_north += cur_speed * np.sin(cur_yaw) * dt
+            lat, lon = self.engine.fusion.enu_to_latlon(cur_east, cur_north)
+
+            # Walking IMU: vertical bounce
+            imu = SensorInputFrame(
+                timestamp=t,
+                acc_x=float(acc + np.random.normal(0, 0.1)),
+                acc_y=float(cur_speed * yaw_rate + np.random.normal(0, 0.1)),
+                acc_z=9.81 + float(np.random.normal(0, 0.3)),
+                gyro_x=float(np.random.normal(0, 0.02)),
+                gyro_y=float(np.random.normal(0, 0.02)),
+                gyro_z=float(yaw_rate + np.random.normal(0, 0.02)),
+            )
+
+            # Blackout between 500 and 700
+            is_in_tunnel = 500 <= k <= 700
+            gnss = None
+            if not is_in_tunnel:
+                gnss = GNSSInputFix(
+                    timestamp=t,
+                    latitude=lat + float(np.random.normal(0, 1e-5)),
+                    longitude=lon + float(np.random.normal(0, 1e-5)),
+                    accuracy_m=3.0,
+                    speed_mps=cur_speed,
+                    heading_deg=float((90.0 - np.rad2deg(cur_yaw)) % 360.0),
+                )
+
+            self.data_frames.append((imu, gnss))
+
+        self.current_index = 0
+        return True

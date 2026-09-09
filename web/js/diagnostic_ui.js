@@ -216,7 +216,10 @@ class IDRDiagnosticUI {
       if (!this.wasInBlackout) {
         this.wasInBlackout = true;
         this.blackoutStartTime = Date.now();
-        if (this.outageToastEl) this.outageToastEl.classList.remove('hidden');
+        if (this.outageToastEl) {
+          this.outageToastEl.classList.remove('hidden');
+          this.outageToastEl.innerHTML = '<span>⚠️ GNSS LOST / BLACKOUT</span>';
+        }
         if (this.recoveryToastEl) this.recoveryToastEl.classList.add('hidden');
         if (this._recoveryTimeout) clearTimeout(this._recoveryTimeout);
 
@@ -244,6 +247,7 @@ class IDRDiagnosticUI {
         if (this.outageToastEl) this.outageToastEl.classList.add('hidden');
         if (this.recoveryToastEl) {
           this.recoveryToastEl.classList.remove('hidden');
+          this.recoveryToastEl.innerHTML = '<span>✅ GNSS RECOVERED</span>';
           this._recoveryTimeout = setTimeout(() => {
             if (this.recoveryToastEl) this.recoveryToastEl.classList.add('hidden');
           }, 3500);
@@ -294,19 +298,47 @@ class IDRDiagnosticUI {
     // 8. Crash Alert / SOS State (USP 4)
     if (state.active_crash_alert) {
       const alert = state.active_crash_alert;
-      if (this.crashToastEl) this.crashToastEl.classList.remove('hidden');
+      if (this.crashToastEl) {
+        this.crashToastEl.classList.remove('hidden');
+        this.crashToastEl.style.backgroundColor = 'var(--status-rose)';
+        this.crashToastEl.innerHTML = '<span style="font-weight: bold; font-size: 1.1em;">🚨 CRASH DETECTED</span>';
+      }
       if (this.crashAlertDetailsEl) {
-        this.crashAlertDetailsEl.textContent = `${alert.vehicle_type ? alert.vehicle_type.toUpperCase() : 'VEHICLE'} · Peak Impact ${alert.impact_g_force}g · Stillness Confirmed`;
+        const details = `${alert.vehicle_type ? alert.vehicle_type.toUpperCase() : 'VEHICLE'} · Peak Impact ${alert.impact_g_force}g · Stillness Confirmed`;
+        this.crashAlertDetailsEl.textContent = details;
       }
       if (this.diagCrashStatusEl) {
         this.diagCrashStatusEl.textContent = 'ALERT ACTIVE (CONFIRMED)';
         this.diagCrashStatusEl.className = 'field-value highlight-amber';
       }
     } else {
-      if (this.crashToastEl) this.crashToastEl.classList.add('hidden');
+      if (this.crashToastEl) {
+        this.crashToastEl.classList.add('hidden');
+        this.crashToastEl.style.backgroundColor = '';
+      }
       if (this.diagCrashStatusEl) {
         this.diagCrashStatusEl.textContent = 'MONITORING';
         this.diagCrashStatusEl.className = 'field-value status-active';
+      }
+    }
+  }
+
+  // Blackspot Proximity Warning Handler
+  handleBlackspotWarning(data) {
+    if (this.outageToastEl) {
+      this.outageToastEl.classList.remove('hidden');
+      const color = data.severity === 'SEVERE' ? 'var(--status-rose)' : 'var(--status-amber)';
+      this.outageToastEl.style.backgroundColor = color;
+      this.outageToastEl.innerHTML = `⚠️ BLACKSPOT NEARBY: ${data.id} (${data.dist}m)`;
+    }
+  }
+
+  clearBlackspotWarning() {
+    if (this.outageToastEl) {
+      // Only hide if not in an actual blackout
+      if (!this.wasInBlackout) {
+        this.outageToastEl.classList.add('hidden');
+        this.outageToastEl.style.backgroundColor = ''; // Reset to default
       }
     }
   }

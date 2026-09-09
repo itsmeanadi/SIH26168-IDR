@@ -51,10 +51,10 @@ class IDRMapLayer {
       preferCanvas: true,
     }).setView([initialLat, initialLon], 16);
 
-    // High performance dark Esri Canvas tile layer (100% Watermark-Free)
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+    // Real OpenStreetMap raster tile layer (Live Geography)
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
-      attribution: '© Esri, HERE, Garmin, OpenStreetMap',
+      attribution: '© OpenStreetMap contributors',
     }).addTo(this.map);
 
     // Minimalist Directional Navigation Vehicle Puck
@@ -131,8 +131,6 @@ class IDRMapLayer {
     }
 
     // Trajectory tracking with Standstill Jitter Suppression
-    // Points are added only if the vehicle is in motion (speed >= 0.3 m/s) and displaced >= 1.2 meters,
-    // or on the initial anchor point. Stationary sub-meter GPS noise is not drawn into the trajectory.
     const activePath = isBlackout ? this.drPath : this.fusedPath;
     const activePolyline = isBlackout ? this.drPolyline : this.fusedPolyline;
 
@@ -153,7 +151,10 @@ class IDRMapLayer {
       if (activePolyline) activePolyline.setLatLngs(activePath);
     }
 
-    // Auto-center camera: smoothly follow vehicle in motion; suppress jitter while stationary
+    // Proximity check for Blackspots (Warning Trigger)
+    this._checkBlackspotProximity(lat, lon);
+
+    // Auto-center camera
     if (this.isAutoCenter && this.map) {
       if (!isStationary && speedMps >= 0.3) {
         this.map.panTo(latLng, { animate: true, duration: 0.15 });
@@ -161,6 +162,39 @@ class IDRMapLayer {
         this.map.setView(latLng, 17, { animate: true });
         this._hasInitialCentered = true;
       }
+    }
+  }
+
+  _checkBlackspotProximity(lat, lon) {
+    if (!this.blackspotsLayer) return;
+
+    let nearestSpot = null;
+    let minDist = 50.0; // Warning threshold in meters
+
+    this.blackspotsLayer.eachLayer((layer) => {
+      const bounds = layer.getBounds();
+      if (!bounds) return;
+
+      // Simple distance to center of polygon/point
+      const center = bounds.getCenter();
+      const dist = this._getDistanceMeters(lat, lon, center.lat, center.lng);
+
+      if (dist < minDist) {
+        minDist = dist;
+        nearestSpot = layer.feature.properties;
+      }
+    });
+
+    if (nearestSpot) {
+      window.dispatchEvent(new CustomEvent('idr:blackspot-warning', {
+        detail: {
+          id: nearestSpot.id,
+          dist: Math.round(minDist),
+          severity: nearestSpot.severity || 'MEDIUM'
+        }
+      }));
+    } else {
+      window.dispatchEvent(new CustomEvent('idr:blackspot-warning-clear'));
     }
   }
 

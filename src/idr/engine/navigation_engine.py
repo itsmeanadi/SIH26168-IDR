@@ -431,7 +431,7 @@ class NavigationEngine:
             self.fusion.es_ekf.update_attitude(
                 roll_rad=veh_roll_rad,
                 pitch_rad=veh_pitch_rad,
-                yaw_rad=psi_compass if (gnss is None or gnss.speed_mps is None or gnss.speed_mps < 1.5) else None,
+                yaw_rad=psi_compass if (gnss is None or gnss.speed_mps is None or gnss.speed_mps < 2.0) else None,
                 sigma_att=0.08,
             )
         else:
@@ -532,7 +532,7 @@ class NavigationEngine:
                 r_cov = np.eye(3) * ((gnss.accuracy_m or 3.0) ** 2)
                 if self.navigation_filter in ("es_ekf", "15state") and self.fusion.es_ekf is not None:
                     self.fusion.es_ekf.update_gnss_pos(gnss_enu, R_cov=r_cov)
-                    if gnss.heading_deg is not None and gnss.speed_mps is not None and gnss.speed_mps >= 1.5:
+                    if gnss.heading_deg is not None and gnss.speed_mps is not None and gnss.speed_mps >= 1.0:
                         psi_gnss = np.deg2rad(90.0 - gnss.heading_deg)
                         self.fusion.es_ekf.update_heading(psi_gnss, sigma_yaw=0.05)
                     if gnss.speed_mps is not None and gnss.speed_mps >= 0.5:

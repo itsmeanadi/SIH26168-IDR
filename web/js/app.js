@@ -59,21 +59,56 @@ class IDRApp {
     // 3. Bind UI Controls
     this._bindControls();
 
-    // 4. Initial Health & Blackspots Load
+    // 4. Try to center map on user's actual location immediately
+    this._centerOnActualUserLocation();
+
+    // 5. Initial Health & Blackspots Load
     this._refreshSystemHealth();
     this._refreshBlackspots();
 
-    // 5. Populate guide URLs
+    // 6. Populate guide URLs
     this._populateGuideUrls();
 
-    // 6. Update Initial Home Subsystem States
+    // 7. Update Initial Home Subsystem States
     this._updateHomeStatusSemantics();
 
-    // 7. Register Service Worker
+    // 8. Register Service Worker
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/service-worker.js').catch((err) => {
         console.log('ServiceWorker registration optional:', err);
       });
+    }
+
+    // 9. Listen for Blackspot Proximity Events
+    window.addEventListener('idr:blackspot-warning', (e) => {
+      if (this.diag) this.diag.handleBlackspotWarning(e.detail);
+    });
+    window.addEventListener('idr:blackspot-warning-clear', () => {
+      if (this.diag) this.diag.clearBlackspotWarning();
+    });
+  }
+
+  async _centerOnActualUserLocation() {
+    if (!navigator.geolocation) {
+      console.warn('[IDR] Geolocation not supported by browser');
+      return;
+    }
+
+    try {
+      const position = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 5000,
+          maximumAge: 0
+        });
+      });
+
+      const { latitude, longitude } = position.coords;
+      console.log(`[IDR] Centering map on user location: ${latitude}, ${longitude}`);
+      this.map.setView([latitude, longitude], 16);
+    } catch (err) {
+      console.warn('[IDR] Could not center on user location:', err.message);
+      // Do NOT substitute a fake location here.
     }
   }
 
@@ -214,6 +249,19 @@ class IDRApp {
     // ── Home Screen CTAs ──
     const btnStartLive = document.getElementById('btn-home-start-live');
     if (btnStartLive) {
+      // Create a dedicated Walking Demo button for instant results
+      const btnWalkingDemo = document.createElement('button');
+      btnWalkingDemo.id = 'btn-home-start-walking';
+      btnWalkingDemo.className = 'btn-secondary';
+      btnWalkingDemo.style.cssText = 'margin-bottom: 10px; background: var(--status-emerald); color: white; font-weight: bold;';
+      btnWalkingDemo.textContent = '🚀 START WALKING DEMO (Instant Results)';
+      btnWalkingDemo.onclick = async () => {
+        this.switchScreen('nav');
+        this.setProvenance('replay', 'Walking');
+        await this._startJudgeReplayDemo('walking');
+      };
+      btnStartLive.parentNode.insertBefore(btnWalkingDemo, btnStartLive);
+
       btnStartLive.onclick = async () => {
         await this._handleStartLiveNavigation();
       };
@@ -446,6 +494,30 @@ class IDRApp {
     }
   }
 
+  async _handleStartLiveNavigation() {
+    try {
+      await this.client.controlReplay('pause');
+      await this.client.resetNavigation();
+      this.map.resetPaths();
+
+      // Attempt sensor initialization
+      const started = await this.sensors.start();
+      const isSec = this.sensors.telemetry.isSecureContext;
+
+      if (started) {
+        this.isPhoneSensorsActive = true;
+        this.switchScreen('nav');
+        this.setProvenance('live');
+      } else {
+        // Sensors could not start (permission denied or insecure context)
+        this._showSensorReadinessModal(isSec);
+      }
+    } catch (err) {
+      console.error('[IDR] Error starting live navigation:', err);
+      this._showSensorReadinessModal(false);
+    }
+  }
+
   _showSensorReadinessModal(isSecure) {
     if (!this.readinessModal) return;
 
@@ -464,6 +536,26 @@ class IDRApp {
       this.readinessSecEl.style.color = isSecure ? 'var(--status-emerald)' : 'var(--status-amber)';
     }
 
+    // Add a "Quick Demo" button to the modal if sensors are blocked
+    if (!isSecure) {
+      const demoBtn = document.createElement('button');
+      demoBtn.className = 'btn-primary-sm';
+      demoBtn.style.marginTop = '15px';
+      demoBtn.textContent = 'Try Walking Demo (Replay)';
+      demoBtn.onclick = async () => {
+        this.readinessModal.classList.remove('active');
+        this.switchScreen('nav');
+        this.setProvenance('replay', 'Walking');
+        await this._startJudgeReplayDemo('walking');
+      };
+
+      // Append to modal if not already present
+      if (!this.readinessModal.querySelector('.demo-fallback-btn')) {
+        demoBtn.classList.add('demo-fallback-btn');
+        this.readinessModal.appendChild(demoBtn);
+      }
+    }
+
     this.readinessModal.classList.add('active');
   }
 
@@ -474,8 +566,28 @@ class IDRApp {
         this.isPhoneSensorsActive = false;
       }
       this.map.resetPaths();
-      await this.client.controlReplay('load', { drive_name: driveName });
-      await this.client.controlReplay('play');
+
+      // Ensure WebSocket is connected before starting replay
+      if (!this.client.isConnected) {
+        await new Promise(resolve => {
+          const check = setInterval(() => {
+            if (this.client.isConnected) {
+              clearInterval(check);
+              resolve();
+            }
+          }, 100);
+          setTimeout(() => { clearInterval(check); resolve(); }, 2000);
+        });
+      }
+
+      console.log(`[IDR] WALKING LOAD sent: ${driveName}`);
+      const loadRes = await this.client.controlReplay('load', { drive_name: driveName });
+      console.log(`[IDR] WALKING LOAD response:`, loadRes);
+
+      console.log(`[IDR] WALKING PLAY sent`);
+      const playRes = await this.client.controlReplay('play');
+      console.log(`[IDR] WALKING PLAY response:`, playRes);
+
       const driveLabelEl = document.getElementById('replay-drive-label');
       if (driveLabelEl) {
         driveLabelEl.textContent = `Replay: ${driveName}`;
@@ -518,7 +630,15 @@ class IDRApp {
     // 2. Update HUD Gauges & Toasts
     this.diag.update(state);
 
-    // 3. Update Replay Scrubber & Time
+    // 3. Handle Blackspot Proximity Warnings
+    if (this.diag && this.map) {
+      // The map layer handles proximity detection and dispatches a custom event
+      // but we can also explicitly call the handler here if we have the state
+      // However, map.updateVehicleState already calls _checkBlackspotProximity.
+      // We just need to make sure the app listens for those events.
+    }
+
+    // 4. Update Replay Scrubber & Time
     if (replayStatus) {
       const scrubber = document.getElementById('replay-scrubber');
       if (scrubber) scrubber.value = replayStatus.progress_percent || 0;
