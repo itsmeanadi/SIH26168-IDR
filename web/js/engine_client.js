@@ -3,29 +3,81 @@
  * Manages WebSocket real-time connection and REST API operations.
  */
 
+const BACKEND_CONFIG = {
+  LOCAL: 'http://10.89.225.17:8000',
+  RENDER: 'https://sih26168-idr-3.onrender.com'
+};
+
 class IDREngineClient {
-  constructor(baseUrl = window.location.origin) {
-    this.baseUrl = baseUrl;
-    this.wsUrl = baseUrl.replace(/^http/, 'ws') + '/ws/navigation';
+  constructor() {
+    this.baseUrl = window.location.origin;
+    this.wsUrl = this._deriveWsUrl(this.baseUrl);
     this.socket = null;
     this.isConnected = false;
     this.onStateCallback = null;
     this.onStatusChangeCallback = null;
     this.reconnectIntervalMs = 2000;
     this._reconnectTimer = null;
+    this.currentBackend = 'UNKNOWN'; // 'LOCAL' | 'RENDER'
   }
 
-  connect(onState, onStatusChange) {
+  _deriveWsUrl(url) {
+    return url.replace(/^http/, 'ws') + '/ws/navigation';
+  }
+
+  async connect(onState, onStatusChange) {
     this.onStateCallback = onState;
     this.onStatusChangeCallback = onStatusChange;
 
+    // 1. Try Local first
+    if (await this._verifyBackend(BACKEND_CONFIG.LOCAL)) {
+      this._setBackend(BACKEND_CONFIG.LOCAL, 'LOCAL');
+    }
+    // 2. Fallback to Render
+    else if (await this._verifyBackend(BACKEND_CONFIG.RENDER)) {
+      this._setBackend(BACKEND_CONFIG.RENDER, 'RENDER');
+    }
+    // 3. Final fallback to current origin
+    else {
+      this._setBackend(window.location.origin, 'UNKNOWN');
+    }
+
+    this._establishWebSocket();
+  }
+
+  async _verifyBackend(url) {
     try {
+      // Use a short timeout for connectivity check
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), 1500);
+
+      const res = await fetch(`${url}/api/system/health`, {
+        signal: controller.signal,
+        mode: 'cors'
+      });
+      clearTimeout(id);
+      return res.ok;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  _setBackend(url, name) {
+    this.baseUrl = url;
+    this.wsUrl = this._deriveWsUrl(url);
+    this.currentBackend = name;
+    console.log(`[IDR] Backend selected: ${name} (${url})`);
+  }
+
+  _establishWebSocket() {
+    try {
+      if (this.socket) this.socket.close();
       this.socket = new WebSocket(this.wsUrl);
 
       this.socket.onopen = () => {
         this.isConnected = true;
         if (this.onStatusChangeCallback) this.onStatusChangeCallback(true);
-        console.log('IDR Engine WebSocket connected');
+        console.log(`IDR Engine WebSocket connected to ${this.currentBackend}`);
       };
 
       this.socket.onmessage = (event) => {
@@ -42,7 +94,7 @@ class IDREngineClient {
       this.socket.onclose = () => {
         this.isConnected = false;
         if (this.onStatusChangeCallback) this.onStatusChangeCallback(false);
-        this._scheduleReconnect();
+        this._handleDisconnect();
       };
 
       this.socket.onerror = (err) => {
@@ -50,6 +102,17 @@ class IDREngineClient {
         this.socket.close();
       };
     } catch (e) {
+      this._handleDisconnect();
+    }
+  }
+
+  _handleDisconnect() {
+    // If we were on LOCAL, try to fall back to RENDER immediately
+    if (this.currentBackend === 'LOCAL') {
+      console.warn('[IDR] Local backend lost. Falling back to Render...');
+      this._setBackend(BACKEND_CONFIG.RENDER, 'RENDER');
+      this._establishWebSocket();
+    } else {
       this._scheduleReconnect();
     }
   }
@@ -58,13 +121,12 @@ class IDREngineClient {
     if (this._reconnectTimer) return;
     this._reconnectTimer = setTimeout(() => {
       this._reconnectTimer = null;
-      this.connect(this.onStateCallback, this.onStatusChangeCallback);
+      this._establishWebSocket();
     }, this.reconnectIntervalMs);
   }
 
   sendSensorFrame(imu, gnss) {
     if (!this.isConnected || !this.socket || this.socket.readyState !== WebSocket.OPEN) {
-      // Fallback: send via REST if socket not yet open or reconnecting
       return this._sendRestFrame(imu, gnss);
     }
     try {

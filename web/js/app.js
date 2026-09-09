@@ -665,7 +665,29 @@ class IDRApp {
       const text = document.getElementById('provenance-text');
       if (text) text.textContent = connected ? 'Ready' : 'Connecting';
     }
+
+    // Update Backend Status Indicator
+    this._updateBackendStatusUI(connected);
     this._updateHomeStatusSemantics();
+  }
+
+  _updateBackendStatusUI(connected) {
+    let statusEl = document.getElementById('backend-status-pill');
+    if (!statusEl) {
+      statusEl = document.createElement('div');
+      statusEl.id = 'backend-status-pill';
+      statusEl.style.cssText = 'font-size: 10px; font-weight: bold; color: var(--text-muted); margin-left: 10px; padding: 2px 6px; border-radius: 4px; background: rgba(0,0,0,0.2);';
+      if (this.appHeader) this.appHeader.appendChild(statusEl);
+    }
+
+    const backend = this.client.currentBackend;
+    if (connected) {
+      statusEl.textContent = `${backend} • CONNECTED`;
+      statusEl.style.color = 'var(--status-emerald)';
+    } else {
+      statusEl.textContent = `${backend} • DISCONNECTED`;
+      statusEl.style.color = 'var(--status-amber)';
+    }
   }
 
   async _refreshSystemHealth() {

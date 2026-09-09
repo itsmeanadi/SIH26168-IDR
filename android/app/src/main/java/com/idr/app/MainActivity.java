@@ -10,12 +10,17 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.URL;
 
 public class MainActivity extends Activity {
     private WebView webView;
     private SensorBridge sensorBridge;
     private Handler syncHandler = new Handler();
-    private final String SERVER_URL = "http://10.89.225.17:8000"; // User should update this to their server IP
+
+    private final String LOCAL_URL = "http://10.89.225.17:8000";
+    private final String RENDER_URL = "https://sih26168-idr-3.onrender.com";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -32,7 +37,32 @@ public class MainActivity extends Activity {
         // Start periodic sync to JS at 10Hz
         syncHandler.post(syncRunnable);
 
-        webView.loadUrl(SERVER_URL);
+        // Determine backend to load
+        String finalUrl = determineBackend();
+        webView.loadUrl(finalUrl);
+    }
+
+    private String determineBackend() {
+        if (isBackendAvailable(LOCAL_URL)) {
+            return LOCAL_URL;
+        } else if (isBackendAvailable(RENDER_URL)) {
+            return RENDER_URL;
+        }
+        return RENDER_URL; // Default fallback
+    }
+
+    private boolean isBackendAvailable(String urlString) {
+        try {
+            URL url = new URL(urlString + "/api/system/health");
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setConnectTimeout(2000);
+            connection.setReadTimeout(2000);
+            connection.setRequestMethod("GET");
+            int responseCode = connection.getResponseCode();
+            return (responseCode == HttpURLConnection.HTTP_OK);
+        } catch (IOException e) {
+            return false;
+        }
     }
 
     private void configureWebView() {
@@ -78,6 +108,5 @@ public class MainActivity extends Activity {
     @Override
     protected void onPause() {
         super.onPause();
-        // Stop sensor updates if needed to save battery
     }
 }
