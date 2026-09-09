@@ -132,7 +132,7 @@ public class MainActivity extends Activity {
         settings.setAllowContentAccess(true);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
 
-        // Expose bridge for runtime backend URL configuration from WebView
+        // Expose bridge for runtime backend URL configuration & settings from WebView
         webView.addJavascriptInterface(new Object() {
             @JavascriptInterface
             public void setBackendUrl(String url) {
@@ -147,6 +147,17 @@ public class MainActivity extends Activity {
             @JavascriptInterface
             public String getBackendUrl() {
                 return getSavedBackendUrl();
+            }
+
+            @JavascriptInterface
+            public void openLocationSettings() {
+                try {
+                    Intent intent = new Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+                    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    startActivity(intent);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
             }
         }, "AndroidConfig");
 

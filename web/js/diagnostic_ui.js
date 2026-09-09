@@ -14,6 +14,12 @@ class IDRDiagnosticUI {
     this.modePillEl = document.getElementById('nav-mode-pill');
     this.modeTextEl = document.getElementById('nav-mode-text');
 
+    // Secondary Info Row in Bottom HUD
+    this.hudSecGpsEl = document.getElementById('hud-sec-gps');
+    this.hudSecTripEl = document.getElementById('hud-sec-route-rem');
+    this.hudSecDurationEl = document.getElementById('hud-sec-duration');
+    this.hudSecDotEl = document.getElementById('hud-sec-dot');
+
     // Toasts
     this.outageToastEl = document.getElementById('outage-toast');
     this.recoveryToastEl = document.getElementById('recovery-toast');
@@ -30,6 +36,12 @@ class IDRDiagnosticUI {
 
     // Diagnostics Modal Elements
     this.diagModalEl = document.getElementById('modal-diagnostics');
+    this.diagBackendNameEl = document.getElementById('diag-backend-name');
+    this.diagBackendUrlEl = document.getElementById('diag-backend-url');
+    this.diagBackendWsEl = document.getElementById('diag-backend-ws');
+    this.inputCustomBackendEl = document.getElementById('input-custom-backend');
+    this.btnApplyCustomBackendEl = document.getElementById('btn-apply-custom-backend');
+
     this.diagPipeModeEl = document.getElementById('diag-pipe-mode');
     this.diagSrcSpeedEl = document.getElementById('diag-src-speed');
     this.diagSrcHeadingEl = document.getElementById('diag-src-heading');
@@ -58,6 +70,9 @@ class IDRDiagnosticUI {
     this.lastTelem = null;
     this.currentMode = 'standby';
     this.modeLabel = '';
+    this.backendInfo = { name: 'ORIGIN', url: window.location.origin, isConnected: false };
+
+    this._bindCustomBackend();
 
     // Session Summary Modal Elements
     this.summaryModalEl = document.getElementById('modal-summary');
@@ -191,15 +206,18 @@ class IDRDiagnosticUI {
     const navMode = String(state.nav_mode || (isInBlackout ? 'DEAD_RECKONING_NHC_AI' : 'DEAD_RECKONING_PURE'));
 
     if (this.modePillEl && this.modeTextEl) {
-      if (isInBlackout || navMode.startsWith('DEAD_RECKONING') || navMode === 'STATIONARY_ZUPT') {
+      if (isInBlackout || navMode.startsWith('DEAD_RECKONING')) {
         this.modePillEl.className = 'nav-status-pill mode-dr';
-        this.modeTextEl.textContent = navMode === 'STATIONARY_ZUPT' ? 'Stationary Anchor (ZUPT)' : 'Dead Reckoning Active';
+        this.modeTextEl.textContent = 'Dead Reckoning Active';
+      } else if (navMode === 'STATIONARY_ZUPT') {
+        this.modePillEl.className = 'nav-status-pill mode-dr';
+        this.modeTextEl.textContent = 'Stationary Anchor (ZUPT)';
       } else if (navMode.includes('REACQUISITION')) {
         this.modePillEl.className = 'nav-status-pill mode-reacq';
-        this.modeTextEl.textContent = 'Reacquiring Position';
+        this.modeTextEl.textContent = 'Reacquiring GPS';
       } else if (navMode.includes('GNSS')) {
         this.modePillEl.className = 'nav-status-pill mode-gnss';
-        this.modeTextEl.textContent = 'GNSS Active';
+        this.modeTextEl.textContent = state.gnss_status === 'DEGRADED' ? 'GPS Degraded' : 'GPS Connected';
       } else {
         this.modePillEl.className = 'nav-status-pill mode-dr';
         this.modeTextEl.textContent = 'Dead Reckoning Active';
@@ -218,7 +236,6 @@ class IDRDiagnosticUI {
         this.blackoutStartTime = Date.now();
         if (this.outageToastEl) {
           this.outageToastEl.classList.remove('hidden');
-          this.outageToastEl.innerHTML = '<span>⚠️ GNSS LOST / BLACKOUT</span>';
         }
         if (this.recoveryToastEl) this.recoveryToastEl.classList.add('hidden');
         if (this._recoveryTimeout) clearTimeout(this._recoveryTimeout);
@@ -247,7 +264,7 @@ class IDRDiagnosticUI {
         if (this.outageToastEl) this.outageToastEl.classList.add('hidden');
         if (this.recoveryToastEl) {
           this.recoveryToastEl.classList.remove('hidden');
-          this.recoveryToastEl.innerHTML = '<span>✅ GNSS RECOVERED</span>';
+          if (this._recoveryTimeout) clearTimeout(this._recoveryTimeout);
           this._recoveryTimeout = setTimeout(() => {
             if (this.recoveryToastEl) this.recoveryToastEl.classList.add('hidden');
           }, 3500);
@@ -255,18 +272,39 @@ class IDRDiagnosticUI {
       }
     }
 
-    // 6. Expanded Sheet Telemetry Values
+    // 6. Secondary Google Maps-Style Navigation Info Row
     const diag = state.diagnostics || {};
     this.totalDrDistance = Number(diag.total_dr_distance_m || 0.0);
+    const totalDistKm = (this.totalDrDistance / 1000.0).toFixed(1);
     const trustPct = Math.round(Number(state.gnss_trust_score !== undefined ? state.gnss_trust_score : 1.0) * 100);
     const aiSpd = Number(diag.ai_speed_mps || speedMps);
 
+    if (this.hudSecGpsEl) {
+      if (isInBlackout) {
+        this.hudSecGpsEl.textContent = `DR ±${posUnc.toFixed(1)}m`;
+        if (this.hudSecDotEl) this.hudSecDotEl.className = 'sec-icon-dot amber';
+      } else {
+        this.hudSecGpsEl.textContent = `GPS ±${posUnc.toFixed(1)}m`;
+        if (this.hudSecDotEl) this.hudSecDotEl.className = 'sec-icon-dot green';
+      }
+    }
+    if (this.hudSecTripEl) {
+      this.hudSecTripEl.textContent = `Trip ${totalDistKm} km`;
+    }
+    if (this.hudSecDurationEl) {
+      const elapsedSec = Math.floor((Date.now() - this.navigationStartTime) / 1000);
+      const m = String(Math.floor(elapsedSec / 60)).padStart(2, '0');
+      const s = String(elapsedSec % 60).padStart(2, '0');
+      this.hudSecDurationEl.textContent = `${m}:${s}`;
+    }
+
+    // 7. Expanded Sheet Telemetry Values
     if (this.expValUncEl) this.expValUncEl.textContent = `±${posUnc.toFixed(1)} m`;
     if (this.expValAiSpeedEl) this.expValAiSpeedEl.textContent = `${aiSpd.toFixed(1)} m/s`;
     if (this.expValDrDistEl) this.expValDrDistEl.textContent = `${this.totalDrDistance.toFixed(0)} m`;
     if (this.expValTrustEl) this.expValTrustEl.textContent = `${trustPct}%`;
 
-    // 7. Engineering Diagnostics Modal
+    // 8. Engineering Diagnostics Modal
     if (this.diagLatLonEl && state.latitude && state.longitude) {
       this.diagLatLonEl.textContent = `${Number(state.latitude).toFixed(5)}, ${Number(state.longitude).toFixed(5)}`;
     }
@@ -295,16 +333,14 @@ class IDRDiagnosticUI {
       this.diagHeadingUncEl.textContent = `±${Number(diag.heading_uncertainty_deg || 1.5).toFixed(1)}°`;
     }
 
-    // 8. Crash Alert / SOS State (USP 4)
+    // 9. Crash Alert / SOS State (USP 4)
     if (state.active_crash_alert) {
       const alert = state.active_crash_alert;
       if (this.crashToastEl) {
         this.crashToastEl.classList.remove('hidden');
-        this.crashToastEl.style.backgroundColor = 'var(--status-rose)';
-        this.crashToastEl.innerHTML = '<span style="font-weight: bold; font-size: 1.1em;">🚨 CRASH DETECTED</span>';
       }
       if (this.crashAlertDetailsEl) {
-        const details = `${alert.vehicle_type ? alert.vehicle_type.toUpperCase() : 'VEHICLE'} · Peak Impact ${alert.impact_g_force}g · Stillness Confirmed`;
+        const details = `${alert.vehicle_type ? alert.vehicle_type.toUpperCase() : 'VEHICLE'} · Impact ${alert.impact_g_force}g · Stillness Confirmed`;
         this.crashAlertDetailsEl.textContent = details;
       }
       if (this.diagCrashStatusEl) {
@@ -314,7 +350,6 @@ class IDRDiagnosticUI {
     } else {
       if (this.crashToastEl) {
         this.crashToastEl.classList.add('hidden');
-        this.crashToastEl.style.backgroundColor = '';
       }
       if (this.diagCrashStatusEl) {
         this.diagCrashStatusEl.textContent = 'MONITORING';
@@ -327,9 +362,10 @@ class IDRDiagnosticUI {
   handleBlackspotWarning(data) {
     if (this.outageToastEl) {
       this.outageToastEl.classList.remove('hidden');
-      const color = data.severity === 'SEVERE' ? 'var(--status-rose)' : 'var(--status-amber)';
-      this.outageToastEl.style.backgroundColor = color;
-      this.outageToastEl.innerHTML = `⚠️ BLACKSPOT NEARBY: ${data.id} (${data.dist}m)`;
+      const headline = this.outageToastEl.querySelector('.toast-headline');
+      const details = this.outageToastEl.querySelector('.toast-details');
+      if (headline) headline.textContent = `GNSS BLACKSPOT NEARBY · ${data.id}`;
+      if (details) details.textContent = `Distance: ${data.dist}m · Preparing Dead Reckoning`;
     }
   }
 
@@ -338,7 +374,8 @@ class IDRDiagnosticUI {
       // Only hide if not in an actual blackout
       if (!this.wasInBlackout) {
         this.outageToastEl.classList.add('hidden');
-        this.outageToastEl.style.backgroundColor = ''; // Reset to default
+        const headline = this.outageToastEl.querySelector('.toast-headline');
+        if (headline) headline.textContent = 'GPS SIGNAL LOST · DEAD RECKONING ACTIVE';
       }
     }
   }
@@ -440,7 +477,48 @@ class IDRDiagnosticUI {
     }
   }
 
+  updateBackendInfo(name, url, isConnected) {
+    this.backendInfo = { name, url, isConnected };
+    this._refreshBackendUI();
+  }
+
+  _refreshBackendUI() {
+    if (this.diagBackendNameEl) {
+      this.diagBackendNameEl.textContent = this.backendInfo.name || 'UNKNOWN';
+    }
+    if (this.diagBackendUrlEl) {
+      this.diagBackendUrlEl.textContent = this.backendInfo.url || '--';
+    }
+    if (this.diagBackendWsEl) {
+      if (this.backendInfo.isConnected) {
+        this.diagBackendWsEl.textContent = '● CONNECTED';
+        this.diagBackendWsEl.className = 'field-value status-active';
+      } else {
+        this.diagBackendWsEl.textContent = '○ DISCONNECTED';
+        this.diagBackendWsEl.className = 'field-value highlight-amber';
+      }
+    }
+  }
+
+  _bindCustomBackend() {
+    if (this.btnApplyCustomBackendEl && this.inputCustomBackendEl) {
+      this.btnApplyCustomBackendEl.onclick = () => {
+        const val = this.inputCustomBackendEl.value.trim();
+        if (val) {
+          try {
+            localStorage.setItem('idr_backend_url', val);
+            alert(`Backend URL saved: ${val}\nReloading application...`);
+            window.location.reload();
+          } catch (e) {
+            console.error('Could not save custom backend to localStorage:', e);
+          }
+        }
+      };
+    }
+  }
+
   _refreshModal() {
+    this._refreshBackendUI();
     if (this.lastState) {
       this.update(this.lastState);
     }

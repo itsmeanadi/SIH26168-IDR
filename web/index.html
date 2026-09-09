@@ -1,213 +1,302 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>IDR Navigation — Intelligent Dead Reckoning</title>
-  <meta name="description" content="Intelligent Dead Reckoning for Two-Wheelers and Four-Wheelers in GNSS-Denied Environments">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>IDR Navigation</title>
+  <meta name="description" content="Intelligent Dead Reckoning Navigation in GNSS-Denied Environments">
   <link rel="manifest" href="/manifest.json">
-  <meta name="theme-color" content="#080c14">
+  <meta name="theme-color" content="#F8F9FA">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
   <link rel="stylesheet" href="/css/app.css">
 </head>
 <body>
 
-  <!-- App Header / Minimal Top Bar (Hidden on Fullscreen Navigation) -->
-  <header id="app-header" class="app-header">
-    <div class="brand-container" id="btn-header-home" role="button" title="IDR Home">
-      <div class="brand-mark">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <polygon points="3 11 22 2 13 21 11 13 3 11"/>
-        </svg>
-      </div>
-      <div class="brand-meta">
-        <span class="brand-title">IDR Navigation</span>
-        <span class="brand-tag">PS 26168</span>
-      </div>
-    </div>
-
-    <!-- Mode / Connection Status Pill -->
-    <div class="header-right">
-      <div id="provenance-pill" class="status-pill standby">
-        <span class="status-indicator"></span>
-        <span id="provenance-text">Standby</span>
-      </div>
-
-      <button id="btn-header-diag" class="btn-subtle-icon" title="Engineering Diagnostics">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="4" y1="21" x2="4" y2="14"></line>
-          <line x1="4" y1="10" x2="4" y2="3"></line>
-          <line x1="12" y1="21" x2="12" y2="12"></line>
-          <line x1="12" y1="8" x2="12" y2="3"></line>
-          <line x1="20" y1="21" x2="20" y2="16"></line>
-          <line x1="20" y1="12" x2="20" y2="3"></line>
-          <line x1="1" y1="14" x2="7" y2="14"></line>
-          <line x1="9" y1="8" x2="15" y2="8"></line>
-          <line x1="17" y1="16" x2="23" y2="16"></line>
-        </svg>
-      </button>
-    </div>
-  </header>
+  <!-- Fullscreen Edge-to-Edge Map Canvas (Visual Hero) -->
+  <div id="map" class="nav-map-canvas"></div>
 
   <!-- ═════════════════════════════════════════════════════════════════════════ -->
-  <!-- SCREEN 1: HOME SCREEN (Application Launchpad)                            -->
+  <!-- FLOATING MAP CONTROLS                                                    -->
   <!-- ═════════════════════════════════════════════════════════════════════════ -->
-  <section id="screen-home" class="app-screen active">
-    <div class="home-layout">
+
+  <!-- Floating Current Location Button (3 States: Normal, Following, Off/Disabled) -->
+  <button id="btn-floating-location" class="btn-map-fab btn-location-fab normal" title="Your Location" aria-label="Current Location">
+    <svg class="icon-loc-normal" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="7"></circle>
+      <line x1="12" y1="1" x2="12" y2="5"></line>
+      <line x1="12" y1="19" x2="12" y2="23"></line>
+      <line x1="1" y1="12" x2="5" y2="12"></line>
+      <line x1="19" y1="12" x2="23" y2="12"></line>
+    </svg>
+    <svg class="icon-loc-following hidden" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="7"></circle>
+      <circle cx="12" cy="12" r="3" fill="#1A73E8"></circle>
+      <line x1="12" y1="1" x2="12" y2="5"></line>
+      <line x1="12" y1="19" x2="12" y2="23"></line>
+      <line x1="1" y1="12" x2="5" y2="12"></line>
+      <line x1="19" y1="12" x2="23" y2="12"></line>
+    </svg>
+    <svg class="icon-loc-off hidden" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="1" y1="1" x2="23" y2="23"></line>
+      <path d="M16.72 11.06A7 7 0 0 1 19 12"></path>
+      <path d="M5 12a7 7 0 0 1 5.17-6.75"></path>
+      <line x1="12" y1="1" x2="12" y2="5"></line>
+      <line x1="12" y1="19" x2="12" y2="23"></line>
+    </svg>
+  </button>
+
+  <!-- ═════════════════════════════════════════════════════════════════════════ -->
+  <!-- HOME VIEW SURFACE (Google Maps-Style Floating Surfaces)                  -->
+  <!-- ═════════════════════════════════════════════════════════════════════════ -->
+  <div id="home-surface-container" class="home-surface active">
+    
+    <!-- Top Floating Header & Search Bar -->
+    <div class="home-top-floating">
       
-      <!-- Hero Product Statement -->
-      <div class="home-hero">
-        <h1 class="hero-headline">CONTINUOUS NAVIGATION<br>WHEN GNSS DISAPPEARS.</h1>
-        <p class="hero-subtext">
-          Dead reckoning navigation powered by smartphone inertial sensing, neural velocity estimation, and 15-state error-state Kalman filtering.
-        </p>
+      <!-- Minimalist App Bar -->
+      <header id="app-header" class="app-header-minimal">
+        <div class="brand-minimal">
+          <div class="brand-mark-dot"></div>
+          <span class="brand-name">IDR Navigation</span>
+        </div>
+
+        <div class="header-minimal-actions">
+          <!-- Location Status Indicator Chip -->
+          <div id="home-loc-chip" class="home-loc-chip" title="Location Status">
+            <span class="beacon-mini emerald" id="home-loc-beacon"></span>
+            <span id="home-loc-chip-text">Searching...</span>
+          </div>
+
+          <!-- Light/Dark Theme Toggle -->
+          <button id="btn-header-theme" class="btn-subtle-circle theme-toggle-btn" title="Toggle Theme" aria-label="Toggle Theme">
+            <svg class="icon-sun hidden" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="5"></circle>
+              <line x1="12" y1="1" x2="12" y2="3"></line>
+              <line x1="12" y1="21" x2="12" y2="23"></line>
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+              <line x1="1" y1="12" x2="3" y2="12"></line>
+              <line x1="21" y1="12" x2="23" y2="12"></line>
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+            </svg>
+            <svg class="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+            </svg>
+          </button>
+
+          <!-- Settings & Diagnostics Button -->
+          <button id="btn-header-diag" class="btn-subtle-circle" title="Settings & Diagnostics" aria-label="Settings">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <!-- Prominent "Where to?" Search Bar -->
+      <div class="search-floating-card">
+        <div class="search-box-inner">
+          <div class="search-icon-wrap">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+          </div>
+          <input 
+            type="text" 
+            id="home-search-input" 
+            class="search-input" 
+            placeholder="Where to?" 
+            autocomplete="off" 
+            autocorrect="off" 
+            autocapitalize="off" 
+            spellcheck="false"
+          />
+          <div id="search-spinner" class="search-spinner hidden"></div>
+          <button id="btn-clear-search" class="btn-clear-search hidden" title="Clear Search" aria-label="Clear">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Live Geocoding Search Results Dropdown -->
+        <div id="home-search-results" class="search-results-panel hidden"></div>
       </div>
 
-      <!-- Primary Action Stack -->
-      <div class="action-stack">
-        <button id="btn-home-start-live" class="btn btn-primary btn-large">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+      <!-- Location State Banners (State B: Permission Needed, State C: Location Off, State D: Unavailable) -->
+      <div id="banner-location-state" class="location-banner hidden">
+        <div class="loc-banner-icon">
+          <svg id="loc-banner-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+        </div>
+        <div class="loc-banner-text">
+          <div id="loc-banner-title" class="loc-banner-title">Location is off</div>
+          <div id="loc-banner-desc" class="loc-banner-desc">Turn on Location to see your position and calculate routes.</div>
+        </div>
+        <button id="btn-loc-banner-action" class="btn-loc-action">Turn On</button>
+      </div>
+
+    </div>
+
+    <!-- Bottom Floating Navigation Surface (Google Maps / Apple Maps Restrained Bottom Card) -->
+    <div class="home-bottom-floating">
+      <div class="home-card-restrained">
+        
+        <!-- Quick Destination Shortcuts (Home, Work, Recent) -->
+        <div class="shortcuts-container">
+          <button class="shortcut-chip" id="chip-shortcut-home">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+              <polyline points="9 22 9 12 15 12 15 22"></polyline>
+            </svg>
+            <span id="label-shortcut-home">Home</span>
+          </button>
+
+          <button class="shortcut-chip" id="chip-shortcut-work">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+              <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+            </svg>
+            <span id="label-shortcut-work">Work</span>
+          </button>
+
+          <button class="shortcut-chip" id="chip-shortcut-recent">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+            <span id="label-shortcut-recent">Recent</span>
+          </button>
+        </div>
+
+        <!-- Clean Action Row -->
+        <div class="home-primary-actions">
+          <button id="btn-home-start-live" class="btn btn-primary btn-large">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+            <span>Start Live Navigation</span>
+          </button>
+
+          <button id="btn-open-demo-modal" class="btn btn-secondary btn-large" title="Demonstration Scenarios">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polygon points="10 8 16 12 10 16 10 8"></polygon>
+            </svg>
+            <span>Demo & Replay</span>
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ═════════════════════════════════════════════════════════════════════════ -->
+  <!-- ROUTE PREVIEW FLOATING SHEET (Google Maps-Style Route Overview)           -->
+  <!-- ═════════════════════════════════════════════════════════════════════════ -->
+  <div id="route-preview-sheet" class="route-preview-sheet hidden">
+    <div class="preview-card">
+      <div class="preview-header">
+        <div class="preview-dest-info">
+          <h3 id="preview-dest-title" class="preview-dest-title">Destination</h3>
+          <p id="preview-dest-address" class="preview-dest-address">Calculating best route...</p>
+        </div>
+        <button id="btn-preview-close" class="btn-subtle-circle" title="Close Preview">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Route Badges & Alternatives Row -->
+      <div class="preview-metrics-row">
+        <div class="preview-stat-group">
+          <span id="preview-duration" class="stat-pill primary">12 min</span>
+          <span id="preview-distance" class="stat-pill secondary">4.8 km</span>
+        </div>
+        <div id="route-alternatives-container" class="route-alt-container"></div>
+      </div>
+
+      <!-- Stops Summary if Waypoints Present -->
+      <div id="preview-stops-summary" class="preview-stops-list hidden"></div>
+
+      <!-- Action Buttons -->
+      <div class="preview-action-row">
+        <button id="btn-preview-start" class="btn btn-primary btn-large">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <polygon points="5 3 19 12 5 21 5 3"/>
           </svg>
           <span>Start Navigation</span>
         </button>
-
-        <button id="btn-home-start-replay" class="btn btn-secondary btn-large">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"></circle>
-            <polygon points="10 8 16 12 10 16 10 8"></polygon>
+        <button id="btn-preview-add-stop" class="btn btn-secondary" title="Add Waypoint Stop">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
           </svg>
-          <span>Replay Demonstration</span>
+          <span>Add Stop</span>
         </button>
       </div>
-
-      <!-- Vehicle Profile Selector -->
-      <div class="section-container">
-        <div class="section-label">Vehicle Dynamics</div>
-        <div class="segmented-control">
-          <button id="btn-home-profile-bike" class="segment-btn active">
-            <svg class="segment-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="5.5" cy="17.5" r="3.5"></circle>
-              <circle cx="18.5" cy="17.5" r="3.5"></circle>
-              <path d="M15 6a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm-3 11.5L9 9l3-3 3 4.5h4"></path>
-            </svg>
-            <span>Two-Wheeler</span>
-          </button>
-          <button id="btn-home-profile-car" class="segment-btn">
-            <svg class="segment-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="2" y="5" width="20" height="14" rx="3"></rect>
-              <circle cx="7" cy="17" r="2"></circle>
-              <circle cx="17" cy="17" r="2"></circle>
-              <path d="M5 10h14"></path>
-            </svg>
-            <span>Four-Wheeler</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Demonstration Drive Scenarios -->
-      <div class="section-container">
-        <div class="section-label">Demo Scenarios</div>
-        <div class="scenario-grid">
-          <button class="scenario-chip active" data-drive="Vf">
-            <span class="chip-title">Vf — Motorway</span>
-            <span class="chip-desc">High Speed Cruise (100+ km/h)</span>
-          </button>
-          <button class="scenario-chip" data-drive="M">
-            <span class="chip-title">M — Urban</span>
-            <span class="chip-desc">Roundabouts & Sharp Turns</span>
-          </button>
-          <button class="scenario-chip" data-drive="S">
-            <span class="chip-title">S — Curved Roads</span>
-            <span class="chip-desc">Continuous Motorcycle Lean</span>
-          </button>
-          <button class="scenario-chip" data-drive="Y1">
-            <span class="chip-title">Y1 — Held-Out Test</span>
-            <span class="chip-desc">Unseen Track Evaluation</span>
-          </button>
-          <button class="scenario-chip" data-drive="Synthetic Benchmark">
-            <span class="chip-title">Synthetic — Tunnel</span>
-            <span class="chip-desc">30s Outage Benchmark</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- System Readiness & Subsystem Semantics -->
-      <div class="system-status-panel">
-        <div class="status-grid">
-          <div class="status-cell">
-            <span class="status-cell-title">Engine</span>
-            <div class="status-cell-val" id="stat-engine-state">
-              <span class="beacon-mini emerald"></span>
-              <span>Online</span>
-            </div>
-          </div>
-          <div class="status-cell">
-            <span class="status-cell-title">Live Sensors</span>
-            <div class="status-cell-val" id="stat-sensors-state">
-              <span class="beacon-mini gray"></span>
-              <span>Not Active</span>
-            </div>
-          </div>
-          <div class="status-cell">
-            <span class="status-cell-title">Replay</span>
-            <div class="status-cell-val" id="stat-replay-state">
-              <span class="beacon-mini emerald"></span>
-              <span>Ready</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="system-status-links">
-          <button id="btn-home-diag-link" class="link-action">Diagnostics</button>
-          <span class="link-sep">•</span>
-          <button id="btn-home-sensor-guide" class="link-action">Sensor Setup Guide</button>
-        </div>
-      </div>
-
     </div>
-  </section>
+  </div>
 
   <!-- ═════════════════════════════════════════════════════════════════════════ -->
-  <!-- SCREEN 2: NAVIGATION SCREEN (Edge-to-Edge Map & Floating HUD)            -->
+  <!-- LIVE NAVIGATION HUD SURFACE (Google Maps Automotive Style Cockpit)       -->
   <!-- ═════════════════════════════════════════════════════════════════════════ -->
-  <section id="screen-nav" class="app-screen">
+  <div id="nav-hud-surface" class="nav-hud-surface hidden">
     
-    <!-- Fullscreen Map Canvas -->
-    <div id="map" class="nav-map-canvas"></div>
-
-    <!-- Top Floating Navigation Controls -->
+    <!-- Top Minimal Navigation Bar -->
     <div class="nav-floating-top">
-      <button id="btn-nav-back-home" class="btn-nav-glass" title="Exit Navigation">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+      <button id="btn-nav-back-home" class="btn-nav-glass" title="Exit Navigation" aria-label="Exit Navigation">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
           <line x1="19" y1="12" x2="5" y2="12"></line>
           <polyline points="12 19 5 12 12 5"></polyline>
         </svg>
         <span>Exit</span>
       </button>
 
-      <!-- Center Status Pill -->
+      <!-- Center Minimal Navigation Status Badge -->
       <div id="nav-mode-pill" class="nav-status-pill mode-gnss">
         <span class="status-beacon"></span>
-        <span id="nav-mode-text">GNSS Active</span>
+        <span id="nav-mode-text">GPS Connected</span>
       </div>
 
-      <button id="btn-nav-telemetry" class="btn-nav-glass" title="Engineering Diagnostics">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="4" y1="21" x2="4" y2="14"></line>
-          <line x1="4" y1="10" x2="4" y2="3"></line>
-          <line x1="12" y1="21" x2="12" y2="12"></line>
-          <line x1="12" y1="8" x2="12" y2="3"></line>
-          <line x1="20" y1="21" x2="20" y2="16"></line>
-          <line x1="20" y1="12" x2="20" y2="3"></line>
-          <line x1="1" y1="14" x2="7" y2="14"></line>
-          <line x1="9" y1="8" x2="15" y2="8"></line>
-          <line x1="17" y1="16" x2="23" y2="16"></line>
-        </svg>
-      </button>
+      <div class="nav-top-actions">
+        <button id="btn-nav-theme" class="btn-nav-glass btn-icon-only theme-toggle-btn" title="Toggle Theme" aria-label="Toggle Theme">
+          <svg class="icon-sun hidden" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+          <svg class="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+        </button>
+
+        <button id="btn-nav-telemetry" class="btn-nav-glass btn-icon-only" title="Diagnostics" aria-label="Diagnostics">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
+      </div>
     </div>
 
-    <!-- Crash SOS Alert Banner (USP 4) -->
+    <!-- Crash SOS Alert Toast -->
     <div id="crash-toast" class="crash-toast hidden">
       <div class="crash-bar"></div>
       <div class="crash-content">
@@ -219,17 +308,15 @@
       <button id="btn-cancel-crash" class="btn-crash-cancel">Cancel SOS</button>
     </div>
 
-    <!-- Restrained Outage Notification Toast (Non-Obtrusive) -->
+    <!-- Restrained Outage Notification Toast (Unique IDR Value) -->
     <div id="outage-toast" class="outage-toast hidden">
       <div class="toast-bar"></div>
       <div class="toast-content">
-        <div class="toast-headline">GNSS LOST · DEAD RECKONING</div>
+        <div class="toast-headline">GPS SIGNAL LOST · DEAD RECKONING ACTIVE</div>
         <div class="toast-details">
-          <span>Continuing with inertial navigation</span>
-          <span class="dot-sep">•</span>
           <span>Outage: <b id="val-outage-timer">00:00</b></span>
           <span class="dot-sep">•</span>
-          <span>Confidence: <b id="val-outage-unc">±1.2 m</b></span>
+          <span>Uncertainty: <b id="val-outage-unc">±1.2 m</b></span>
         </div>
       </div>
     </div>
@@ -238,14 +325,12 @@
     <div id="recovery-toast" class="recovery-toast hidden">
       <div class="toast-bar"></div>
       <div class="toast-content">
-        <div class="toast-headline">GNSS RESTORED</div>
+        <div class="toast-headline">GPS SIGNAL RESTORED</div>
         <div class="toast-details">Position re-acquired · Trajectory converged</div>
       </div>
     </div>
 
-    <!-- ═════════════════════════════════════════════════════════════════════════ -->
-    <!-- FLOATING BOTTOM SHEET (Hero Navigation Cockpit & Expandable Telemetry)     -->
-    <!-- ═════════════════════════════════════════════════════════════════════════ -->
+    <!-- Floating Navigation Cockpit Bottom Sheet -->
     <div id="nav-bottom-sheet" class="bottom-sheet collapsed">
       
       <!-- Grab Handle for Drag / Click Toggle -->
@@ -310,7 +395,7 @@
             <div class="lean-value-row">
               <span id="val-lean-text" class="lean-value">0.0°</span>
             </div>
-            <div class="sub-label">Lean Angle</div>
+            <div class="sub-label">Lean</div>
             <div class="lean-track">
               <div class="lean-center-tick"></div>
               <div id="lean-indicator-marker" class="lean-marker"></div>
@@ -319,16 +404,32 @@
 
         </div>
 
+        <!-- Secondary Navigation Info Row (Google Maps style) -->
+        <div class="hud-secondary-row">
+          <div class="sec-telemetry-item">
+            <span class="sec-icon-dot green" id="hud-sec-dot"></span>
+            <span id="hud-sec-gps">GPS ±1.2m</span>
+          </div>
+          <span class="sec-dot-sep">•</span>
+          <div class="sec-telemetry-item" id="hud-route-progress-wrap">
+            <span id="hud-sec-route-rem">Trip 0.0 km</span>
+          </div>
+          <span class="sec-dot-sep">•</span>
+          <div class="sec-telemetry-item">
+            <span id="hud-sec-duration">00:00</span>
+          </div>
+        </div>
+
         <!-- Cockpit Action Toolbar -->
         <div class="hud-toolbar-row">
-          <button id="btn-map-recenter" class="btn-tool-square" title="Recenter Vehicle">
+          <button id="btn-map-recenter" class="btn-tool-square" title="Recenter Vehicle" aria-label="Recenter">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="12" cy="12" r="10"></circle>
               <circle cx="12" cy="12" r="3"></circle>
             </svg>
           </button>
 
-          <button id="btn-sim-blackout" class="btn-hud-action btn-outage-toggle">
+          <button id="btn-sim-blackout" class="btn-hud-action btn-outage-toggle" aria-label="Simulate Outage">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M1 1l22 22"></path>
               <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"></path>
@@ -338,10 +439,10 @@
               <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
               <line x1="12" y1="20" x2="12.01" y2="20"></line>
             </svg>
-            <span>Simulate Outage</span>
+            <span id="sim-blackout-text">Simulate Outage</span>
           </button>
 
-          <button id="btn-finish-trip" class="btn-hud-action btn-trip-end">
+          <button id="btn-finish-trip" class="btn-hud-action btn-trip-end" aria-label="Trip Summary">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="12" cy="12" r="10"></circle>
               <polyline points="12 6 12 12 16 14"></polyline>
@@ -380,10 +481,108 @@
 
     </div>
 
-  </section>
+  </div>
 
   <!-- ═════════════════════════════════════════════════════════════════════════ -->
-  <!-- MODAL 0: SENSOR READINESS & LIVE ENTRY PROMPT                            -->
+  <!-- MODAL: DEMO & REPLAY SCENARIOS DRAWER                                    -->
+  <!-- ═════════════════════════════════════════════════════════════════════════ -->
+  <div id="modal-demo-scenarios" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-top">
+        <div class="modal-heading">
+          <h2 class="modal-title">Demo & Replay Scenarios</h2>
+          <span class="modal-subtitle">Benchmarked Datasets & Walking Validation</span>
+        </div>
+        <button id="btn-close-demo-modal" class="btn-modal-close" title="Close">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+
+      <div class="modal-content">
+        <!-- Vehicle Profile Selector -->
+        <div class="section-container" style="margin-bottom: 12px;">
+          <div class="section-label">Vehicle Dynamics Profile</div>
+          <div class="segmented-control">
+            <button id="btn-home-profile-bike" class="segment-btn active">
+              <svg class="segment-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="5.5" cy="17.5" r="3.5"></circle>
+                <circle cx="18.5" cy="17.5" r="3.5"></circle>
+                <path d="M15 6a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm-3 11.5L9 9l3-3 3 4.5h4"></path>
+              </svg>
+              <span>Two-Wheeler</span>
+            </button>
+            <button id="btn-home-profile-car" class="segment-btn">
+              <svg class="segment-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="5" width="20" height="14" rx="3"></rect>
+                <circle cx="7" cy="17" r="2"></circle>
+                <circle cx="17" cy="17" r="2"></circle>
+                <path d="M5 10h14"></path>
+              </svg>
+              <span>Four-Wheeler</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Demonstration Drive Scenarios -->
+        <div class="section-container">
+          <div class="section-label">Select Replay Scenario</div>
+          <div class="scenario-grid">
+            <button class="scenario-chip active" data-drive="Vf">
+              <div class="chip-header">
+                <span class="chip-title">Motorway Cruise</span>
+                <span class="chip-badge authentic">Authentic · Vf</span>
+              </div>
+              <span class="chip-desc">High Speed Highway Driving</span>
+            </button>
+            <button class="scenario-chip" data-drive="M">
+              <div class="chip-header">
+                <span class="chip-title">Urban Route</span>
+                <span class="chip-badge authentic">Authentic · M</span>
+              </div>
+              <span class="chip-desc">City Turns & Intersections</span>
+            </button>
+            <button class="scenario-chip" data-drive="S">
+              <div class="chip-header">
+                <span class="chip-title">Curved Road</span>
+                <span class="chip-badge authentic">Authentic · S</span>
+              </div>
+              <span class="chip-desc">Continuous Lean Dynamics</span>
+            </button>
+            <button class="scenario-chip" data-drive="Y1">
+              <div class="chip-header">
+                <span class="chip-title">Held-Out Track</span>
+                <span class="chip-badge authentic">Authentic · Y1</span>
+              </div>
+              <span class="chip-desc">Unseen Benchmark Evaluation</span>
+            </button>
+            <button class="scenario-chip" data-drive="walking">
+              <div class="chip-header">
+                <span class="chip-title">Walking Pace</span>
+                <span class="chip-badge synthetic">Synthetic</span>
+              </div>
+              <span class="chip-desc">Pedestrian Speed (1.2 m/s)</span>
+            </button>
+            <button class="scenario-chip" data-drive="Synthetic Benchmark">
+              <div class="chip-header">
+                <span class="chip-title">Tunnel Blackout</span>
+                <span class="chip-badge synthetic">Synthetic</span>
+              </div>
+              <span class="chip-desc">30s GNSS Outage Benchmark</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="action-stack" style="margin-top: 14px;">
+          <button id="btn-modal-start-replay" class="btn btn-primary btn-block btn-large">
+            Start Demonstration Replay
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═════════════════════════════════════════════════════════════════════════ -->
+  <!-- MODAL 0: SENSOR READINESS PROMPT                                         -->
   <!-- ═════════════════════════════════════════════════════════════════════════ -->
   <div id="modal-sensor-readiness" class="modal-backdrop">
     <div class="modal-card">
@@ -437,7 +636,7 @@
       <div class="modal-top">
         <div class="modal-heading">
           <h2 class="modal-title">Engineering Diagnostics</h2>
-          <span class="modal-subtitle">15-State Navigation Filter & Sensor Subsystems</span>
+          <span class="modal-subtitle">15-State Navigation Filter & Subsystems</span>
         </div>
         <button id="btn-close-diagnostics" class="btn-modal-close" title="Close">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
@@ -446,6 +645,29 @@
 
       <div class="modal-content">
         
+        <!-- Backend Connectivity & Network Configuration Section -->
+        <div class="telemetry-group">
+          <div class="group-title">Backend Connectivity & LAN Network</div>
+          <div class="telemetry-table">
+            <div class="table-row">
+              <span class="field-name">Active Backend</span>
+              <span class="field-value" id="diag-backend-name">--</span>
+            </div>
+            <div class="table-row">
+              <span class="field-name">Backend URL</span>
+              <span class="field-value text-break" id="diag-backend-url">--</span>
+            </div>
+            <div class="table-row">
+              <span class="field-name">WebSocket Status</span>
+              <span class="field-value" id="diag-backend-ws">--</span>
+            </div>
+          </div>
+          <div class="custom-backend-form">
+            <input type="text" id="input-custom-backend" class="form-input" placeholder="e.g. http://192.168.1.50:8000" />
+            <button id="btn-apply-custom-backend" class="btn btn-secondary btn-small">Set Backend</button>
+          </div>
+        </div>
+
         <!-- Data Provenance & Pipeline Integrity Section -->
         <div class="telemetry-group">
           <div class="group-title">Data Provenance & Pipeline Integrity</div>
@@ -667,62 +889,53 @@
   </div>
 
   <!-- ═════════════════════════════════════════════════════════════════════════ -->
-  <!-- MODAL 3: PHONE SENSOR SETUP & PERMISSION GUIDE                           -->
+  <!-- MODAL 3: ADD & MANAGE WAYPOINTS / STOPS                                  -->
   <!-- ═════════════════════════════════════════════════════════════════════════ -->
-  <div id="modal-sensor-guide" class="modal-backdrop">
+  <div id="modal-add-stop" class="modal-backdrop">
     <div class="modal-card">
       <div class="modal-top">
         <div class="modal-heading">
-          <h2 class="modal-title">Live Sensor Configuration</h2>
-          <span class="modal-subtitle">Browser Security & Hardware Permissions</span>
+          <h2 class="modal-title">Add Stop</h2>
+          <span class="modal-subtitle">Add Intermediate Route Waypoint</span>
         </div>
-        <button id="btn-close-sensor-guide" class="btn-modal-close" title="Close">
+        <button id="btn-close-add-stop" class="btn-modal-close" title="Close">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
       </div>
 
       <div class="modal-content">
-        
-        <p class="guide-intro">
-          Modern mobile browsers (Chrome on Android, Safari on iOS) require a <b>Secure Context (HTTPS)</b> to grant access to hardware IMU (accelerometer/gyroscope) and GPS sensors.
-        </p>
-
-        <!-- Primary Recommended Path: HTTPS -->
-        <div class="telemetry-group">
-          <div class="group-title">Primary Path: Secure HTTPS Server (Recommended)</div>
-          <p class="guide-text">
-            Start the secure backend server on your development computer:
-          </p>
-          <code class="guide-code block">python -m idr.server.run_server --ssl</code>
-          <p class="guide-text" style="margin-top: 6px;">
-            Then open the secure URL on your mobile browser:
-          </p>
-          <code id="guide-https-url" class="guide-code highlight">https://192.168.2.208:8000</code>
+        <div class="search-box-inner" style="margin-bottom: 8px;">
+          <div class="search-icon-wrap">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+          </div>
+          <input 
+            type="text" 
+            id="stop-search-input" 
+            class="search-input" 
+            placeholder="Search stop location..." 
+            autocomplete="off"
+          />
+          <div id="stop-search-spinner" class="search-spinner hidden"></div>
         </div>
 
-        <!-- Secondary Path: Dev-only flag -->
+        <div id="stop-search-results" class="search-results-panel compact hidden"></div>
+
+        <!-- Current Stops List -->
         <div class="telemetry-group">
-          <div class="group-title">Secondary Path: Development-Only HTTP Flag</div>
-          <p class="guide-text" style="margin-bottom: 6px;">
-            For local testing over HTTP without SSL certificates:
-          </p>
-          <ol class="guide-steps">
-            <li>In Chrome on your phone, navigate to:<br>
-              <code class="guide-code">chrome://flags/#unsafely-treat-insecure-origin-as-secure</code>
-            </li>
-            <li>Enable the flag and add your server origin:<br>
-              <code id="guide-flag-url" class="guide-code highlight">http://192.168.2.208:8000</code>
-            </li>
-            <li>Tap <b>Relaunch Chrome</b> at the bottom.</li>
-          </ol>
+          <div class="group-title">Current Route Waypoints</div>
+          <div id="modal-stops-list" class="modal-stops-container">
+            <div class="empty-stops-note">No intermediate stops added yet.</div>
+          </div>
         </div>
 
         <div class="modal-actions">
-          <button id="btn-guide-retry" class="btn btn-primary btn-block">
-            Request / Retry Sensor Access
+          <button id="btn-done-add-stop" class="btn btn-primary btn-block">
+            Done
           </button>
         </div>
-
       </div>
     </div>
   </div>
@@ -731,6 +944,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="/js/sensor_layer.js"></script>
   <script src="/js/engine_client.js"></script>
+  <script src="/js/routing_service.js"></script>
   <script src="/js/map_layer.js"></script>
   <script src="/js/diagnostic_ui.js"></script>
   <script src="/js/app.js"></script>
