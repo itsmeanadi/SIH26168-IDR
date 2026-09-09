@@ -289,8 +289,8 @@ class MobileSensorLayer {
           longitude: gps.lon,
           altitude: gps.alt || 0.0,
           accuracy_m: gps.accuracy || 3.0,
-          speed_mps: null, // Native bridge doesn't provide speed in current impl
-          heading_deg: null,
+          speed_mps: (gps.speed !== undefined && gps.speed !== null) ? Number(gps.speed) : null,
+          heading_deg: (gps.bearing !== undefined && gps.bearing !== null) ? Number(gps.bearing) : null,
         };
         this.telemetry.gnss.hasData = true;
         this.telemetry.gnss.status = 'FIX';

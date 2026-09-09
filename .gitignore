@@ -57,11 +57,24 @@ notebooks/.ipynb_checkpoints/
 *.log
 certs/
 
+# Android build & local configuration artifacts
+.gradle/
+android/.gradle/
+android/local.properties
+android/**/build/
+android/app/build/
+*.apk
+*.aab
+*.ap_
+
 # Reports and Results: track all markdown, figures, and plots
+!reports/
+!reports/**
+!docs/
+!docs/**
 !reports/figures/*.png
 !reports/figures/*.jpg
 !reports/figures/*.svg
 !results/figures/*.png
 !results/figures/*.jpg
 !results/figures/*.svg
-

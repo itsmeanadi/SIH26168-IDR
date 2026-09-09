@@ -287,13 +287,14 @@ class DriveReplayer:
         }
 
     def _generate_walking_drive(self, reset_engine: bool = True) -> bool:
-        """Generate a physics-consistent walking session (human pace ~1.3 m/s) with turns and a blackout."""
-        self.drive_name = "Walking Demo (Synthetic)"
+        """Generate a deterministic, physics-consistent synthetic walking session (human pace ~1.3 m/s) with turns and a blackout."""
+        self.drive_name = "Walking Demo (Synthetic Simulation)"
         self.data_frames = []
         ref_lat, ref_lon = 28.6139, 77.2090
         if reset_engine:
             self.engine.reset(ref_lat=ref_lat, ref_lon=ref_lon)
 
+        rng = np.random.default_rng(seed=42)
         dt = 0.1
         total_steps = 1000  # 100 seconds
         cur_east, cur_north = 0.0, 0.0
@@ -329,12 +330,12 @@ class DriveReplayer:
             # Walking IMU: vertical bounce
             imu = SensorInputFrame(
                 timestamp=t,
-                acc_x=float(acc + np.random.normal(0, 0.1)),
-                acc_y=float(cur_speed * yaw_rate + np.random.normal(0, 0.1)),
-                acc_z=9.81 + float(np.random.normal(0, 0.3)),
-                gyro_x=float(np.random.normal(0, 0.02)),
-                gyro_y=float(np.random.normal(0, 0.02)),
-                gyro_z=float(yaw_rate + np.random.normal(0, 0.02)),
+                acc_x=float(acc + rng.normal(0, 0.1)),
+                acc_y=float(cur_speed * yaw_rate + rng.normal(0, 0.1)),
+                acc_z=9.81 + float(rng.normal(0, 0.3)),
+                gyro_x=float(rng.normal(0, 0.02)),
+                gyro_y=float(rng.normal(0, 0.02)),
+                gyro_z=float(yaw_rate + rng.normal(0, 0.02)),
             )
 
             # Blackout between 500 and 700
@@ -343,8 +344,8 @@ class DriveReplayer:
             if not is_in_tunnel:
                 gnss = GNSSInputFix(
                     timestamp=t,
-                    latitude=lat + float(np.random.normal(0, 1e-5)),
-                    longitude=lon + float(np.random.normal(0, 1e-5)),
+                    latitude=lat + float(rng.normal(0, 1e-5)),
+                    longitude=lon + float(rng.normal(0, 1e-5)),
                     accuracy_m=3.0,
                     speed_mps=cur_speed,
                     heading_deg=float((90.0 - np.rad2deg(cur_yaw)) % 360.0),

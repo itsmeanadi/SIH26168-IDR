@@ -431,7 +431,7 @@ class NavigationEngine:
             self.fusion.es_ekf.update_attitude(
                 roll_rad=veh_roll_rad,
                 pitch_rad=veh_pitch_rad,
-                yaw_rad=psi_compass if (gnss is None or gnss.speed_mps is None or gnss.speed_mps < 2.0) else None,
+                yaw_rad=psi_compass if (gnss is None or gnss.speed_mps is None or gnss.speed_mps < 1.5) else None,
                 sigma_att=0.08,
             )
         else:
@@ -532,7 +532,7 @@ class NavigationEngine:
                 r_cov = np.eye(3) * ((gnss.accuracy_m or 3.0) ** 2)
                 if self.navigation_filter in ("es_ekf", "15state") and self.fusion.es_ekf is not None:
                     self.fusion.es_ekf.update_gnss_pos(gnss_enu, R_cov=r_cov)
-                    if gnss.heading_deg is not None and gnss.speed_mps is not None and gnss.speed_mps >= 1.0:
+                    if gnss.heading_deg is not None and gnss.speed_mps is not None and gnss.speed_mps >= 1.5:
                         psi_gnss = np.deg2rad(90.0 - gnss.heading_deg)
                         self.fusion.es_ekf.update_heading(psi_gnss, sigma_yaw=0.05)
                     if gnss.speed_mps is not None and gnss.speed_mps >= 0.5:
@@ -613,28 +613,18 @@ class NavigationEngine:
             if self.has_new_ai_estimate and np.isfinite(self.latest_ai_speed) and self.latest_ai_speed >= 0.0:
                 self.ai_update_count += 1
                 if self.navigation_filter in ("es_ekf", "15state") and self.fusion.es_ekf is not None:
-                    # AI velocity update gate: relax if we are in a prolonged blackout
-                    # and the EKF is potentially drifted (indicated by repeated rejections).
-                    ai_gate = 3.0
-                    if not effective_gnss_valid and self.ai_rejected_count > 10:
-                        ai_gate = 10.0
-
                     accepted, metrics = self.fusion.es_ekf.update_ai_velocity(
                         self.latest_ai_speed,
                         sigma_v=self.last_ai_sigma,
-                        max_innovation_sigma=ai_gate,
+                        max_innovation_sigma=3.0,
                         min_sigma_v=1.0,
                         max_sigma_v=10.0,
                     )
                 else:
-                    ai_gate = 3.0
-                    if not effective_gnss_valid and self.ai_rejected_count > 10:
-                        ai_gate = 10.0
-
                     accepted, metrics = self.fusion.ekf.update_ai_velocity(
                         self.latest_ai_speed,
                         sigma_v=self.last_ai_sigma,
-                        max_innovation_sigma=ai_gate,
+                        max_innovation_sigma=3.0,
                         min_sigma_v=1.0,
                         max_sigma_v=10.0,
                     )
