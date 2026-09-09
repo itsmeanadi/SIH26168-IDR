@@ -12,16 +12,107 @@ Validates:
 
 import numpy as np
 import pytest
-from scratch.validate_es_ekf_math import (
-    compute_analytical_F,
-    compute_numerical_F,
-    quat_mult,
+from idr.filters.es_ekf import (
     quat_to_rot,
-    right_jacobian_so3,
-    rot_to_quat,
-    rotvec_to_quat,
-    skew,
+    quat_multiply as quat_mult,
+    rot_to_euler_rpy,
+    skew_symmetric as skew,
+    so3_right_jacobian as right_jacobian_so3,
+    exp_quaternion as rotvec_to_quat,
+    ErrorStateKalmanFilter,
 )
+
+
+def rot_to_quat(R: np.ndarray) -> np.ndarray:
+    tr = np.trace(R)
+    if tr > 0:
+        S = np.sqrt(tr + 1.0) * 2
+        qw = 0.25 * S
+        qx = (R[2, 1] - R[1, 2]) / S
+        qy = (R[0, 2] - R[2, 0]) / S
+        qz = (R[1, 0] - R[0, 1]) / S
+    elif (R[0, 0] > R[1, 1]) and (R[0, 0] > R[2, 2]):
+        S = np.sqrt(1.0 + R[0, 0] - R[1, 1] - R[2, 2]) * 2
+        qw = (R[2, 1] - R[1, 2]) / S
+        qx = 0.25 * S
+        qy = (R[0, 1] + R[1, 0]) / S
+        qz = (R[0, 2] + R[2, 0]) / S
+    elif R[1, 1] > R[2, 2]:
+        S = np.sqrt(1.0 + R[1, 1] - R[0, 0] - R[2, 2]) * 2
+        qw = (R[0, 2] - R[2, 0]) / S
+        qx = (R[0, 1] + R[1, 0]) / S
+        qy = 0.25 * S
+        qz = (R[1, 2] + R[2, 1]) / S
+    else:
+        S = np.sqrt(1.0 + R[2, 2] - R[0, 0] - R[1, 1]) * 2
+        qw = (R[1, 0] - R[0, 1]) / S
+        qx = (R[0, 2] + R[2, 0]) / S
+        qy = (R[1, 2] + R[2, 1]) / S
+        qz = 0.25 * S
+    q = np.array([qw, qx, qy, qz], dtype=np.float64)
+    return q / np.linalg.norm(q)
+
+
+def compute_analytical_F(p, v, q, ba, bg, acc_m, gyro_m, dt):
+    ekf = ErrorStateKalmanFilter()
+    ekf.set_state(pos=p, vel=v, quat=q, accel_bias=ba, gyro_bias=bg)
+    f_b = acc_m - ba
+    omega_b = gyro_m - bg
+    R = quat_to_rot(q)
+    delta_q = rotvec_to_quat(omega_b * dt)
+    return ekf.compute_discrete_transition_matrix(f_b, omega_b, dt, R, delta_q)
+
+
+def compute_numerical_F(p, v, q, ba, bg, acc_m, gyro_m, dt, eps=1e-7):
+    g_nav = np.array([0.0, 0.0, -9.80665])
+    f_b = acc_m - ba
+    omega_b = gyro_m - bg
+    R = quat_to_rot(q)
+    delta_q = rotvec_to_quat(omega_b * dt)
+    q_nom_next = quat_mult(q, delta_q)
+    q_nom_next /= np.linalg.norm(q_nom_next)
+    a_nav = R @ f_b + g_nav
+    p_nom_next = p + v * dt + 0.5 * a_nav * (dt ** 2)
+    v_nom_next = v + a_nav * dt
+
+    F_num = np.zeros((15, 15), dtype=np.float64)
+    for col in range(15):
+        delta = np.zeros(15)
+        delta[col] = eps
+        p_pert = p + delta[0:3]
+        v_pert = v + delta[3:6]
+        q_pert = quat_mult(q, rotvec_to_quat(delta[6:9]))
+        q_pert /= np.linalg.norm(q_pert)
+        ba_pert = ba + delta[9:12]
+        bg_pert = bg + delta[12:15]
+
+        f_b_pert = acc_m - ba_pert
+        omega_b_pert = gyro_m - bg_pert
+        dq_pert = rotvec_to_quat(omega_b_pert * dt)
+        q_pert_next = quat_mult(q_pert, dq_pert)
+        q_pert_next /= np.linalg.norm(q_pert_next)
+
+        R_pert = quat_to_rot(q_pert)
+        a_nav_pert = R_pert @ f_b_pert + g_nav
+        p_pert_next = p_pert + v_pert * dt + 0.5 * a_nav_pert * (dt ** 2)
+        v_pert_next = v_pert + a_nav_pert * dt
+
+        dp_next = p_pert_next - p_nom_next
+        dv_next = v_pert_next - v_nom_next
+        R_rel = quat_to_rot(q_nom_next).T @ quat_to_rot(q_pert_next)
+        dtheta_next = np.array([
+            R_rel[2, 1] - R_rel[1, 2],
+            R_rel[0, 2] - R_rel[2, 0],
+            R_rel[1, 0] - R_rel[0, 1]
+        ]) * 0.5
+
+        F_num[0:3, col] = dp_next / eps
+        F_num[3:6, col] = dv_next / eps
+        F_num[6:9, col] = dtheta_next / eps
+        F_num[9:12, col] = delta[9:12] / eps
+        F_num[12:15, col] = delta[12:15] / eps
+    return F_num
+
 
 
 def test_quaternion_dcm_consistency():

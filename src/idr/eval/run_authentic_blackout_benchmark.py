@@ -12,11 +12,12 @@ import logging
 import os
 from pathlib import Path
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 import numpy as np
 import pandas as pd
 import torch
 
+from ..data.provenance import SyntheticDataBlockedError
 from ..calib.alignment import PhoneToVehicleAligner
 from ..config import CONFIG, set_seed
 from ..filters.es_ekf import ErrorStateKalmanFilter, ESEKFConfig, exp_quaternion
@@ -84,13 +85,78 @@ class BlackoutRunResult:
     sih_pass_10pct: bool
 
 
+
+def verify_benchmark_dataset_integrity(
+    drive_path: Union[str, Path],
+    drive_id: str,
+    is_authentic_required: bool = True,
+) -> Dict[str, Any]:
+    """Validate dataset provenance and integrity before running benchmark evaluation.
+    
+    Checks:
+    - Dataset root path and resolved directory
+    - Sample count, duration, and sampling rate (Hz)
+    - Reference speed distribution statistics
+    - Authenticity enforcement (strictly blocks mock/synthetic data from scientific benchmarks)
+    """
+    path = Path(drive_path).resolve()
+    path_str = str(path).replace("\\", "/")
+    
+    # Check for mock / synthetic folder signatures
+    is_mock_path = "data/raw/categorised/" in path_str and "categorised_authentic" not in path_str
+    
+    drive = load_drive_pair(Path(drive_path), drive_id)
+    phone_imu, phone_gps, v_speed, t = drive.get_synced_data()
+    
+    N = len(t)
+    dt_arr = np.diff(t) if N > 1 else np.array([0.1])
+    median_dt = float(np.median(dt_arr)) if len(dt_arr) > 0 else 0.1
+    obs_hz = float(1.0 / median_dt) if median_dt > 0 else 10.0
+    
+    stats = {
+        "dataset_root": str(path.parent if path.is_dir() else path),
+        "drive_id": drive_id,
+        "resolved_path": str(path),
+        "sample_count": N,
+        "duration_sec": float(t[-1] - t[0]) if N > 1 else 0.0,
+        "sampling_interval_median_sec": round(median_dt, 4),
+        "sampling_rate_hz": round(obs_hz, 2),
+        "speed_min_mps": round(float(np.min(v_speed)), 3),
+        "speed_max_mps": round(float(np.max(v_speed)), 3),
+        "speed_mean_mps": round(float(np.mean(v_speed)), 3),
+        "speed_std_mps": round(float(np.std(v_speed)), 3),
+        "is_authentic_path": "categorised_authentic" in path_str,
+    }
+    
+    # Enforce authenticity
+    if is_authentic_required:
+        if is_mock_path or "categorised_authentic" not in path_str:
+            raise SyntheticDataBlockedError(
+                f"DATASET INTEGRITY FAILURE: Benchmark '{drive_id}' resolved to mock/synthetic dataset "
+                f"at '{path}'. Authentic benchmark requires genuine dataset from "
+                f"'data/raw/categorised_authentic/'."
+            )
+            
+    logger.info(
+        f"[Dataset Integrity Checked] Drive '{drive_id}': Path={stats['resolved_path']}, "
+        f"Samples={N} ({stats['duration_sec']:.1f}s), Rate={stats['sampling_rate_hz']}Hz, "
+        f"Speed Mean={stats['speed_mean_mps']} m/s (Max={stats['speed_max_mps']} m/s)"
+    )
+    return stats
+
+
 DRIVE_CACHE: Dict[str, Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]] = {}
 
 
-def get_cached_drive_data(drive_path: str, drive_id: str) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """Load and cache authentic drive arrays in memory."""
+def get_cached_drive_data(
+    drive_path: str,
+    drive_id: str,
+    is_authentic_required: bool = True,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Load, verify integrity, and cache authentic drive arrays in memory."""
     key = f"{drive_path}_{drive_id}"
     if key not in DRIVE_CACHE:
+        verify_benchmark_dataset_integrity(drive_path, drive_id, is_authentic_required=is_authentic_required)
         drive = load_drive_pair(Path(drive_path), drive_id)
         DRIVE_CACHE[key] = drive.get_synced_data()
     return DRIVE_CACHE[key]
