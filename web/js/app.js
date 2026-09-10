@@ -35,8 +35,8 @@ class IDRApp {
     // Location State System: 'AVAILABLE' | 'PERMISSION_NEEDED' | 'LOCATION_OFF' | 'SEARCHING' | 'UNAVAILABLE'
     this.locationState = 'SEARCHING';
     this.userLocation = {
-      lat: 28.6139,
-      lon: 77.2090,
+      lat: 0.0,
+      lon: 0.0,
       hasFix: false
     };
     this.isFollowingLocation = false;

@@ -56,7 +56,8 @@ def serialize_state(obj: Any) -> Any:
 
 
 # Global Singleton Navigation Engine, Replayer & Experiment Recorder
-engine = NavigationEngine(ref_lat=28.6139, ref_lon=77.2090, vehicle_type="two_wheeler")
+# We initialize with dummy coordinates; the first valid GNSS fix will anchor the actual origin.
+engine = NavigationEngine(ref_lat=0.0, ref_lon=0.0, vehicle_type="two_wheeler")
 replayer = DriveReplayer(engine)
 recorder = ExperimentRecorder()
 active_websockets: List[WebSocket] = []
@@ -188,8 +189,9 @@ def get_system_health():
 @app.post("/api/navigation/reset")
 def reset_navigation(req: Optional[ConfigRequest] = None):
     """Reset the navigation engine, clearing all trajectories and timers for a fresh demo."""
-    ref_lat = req.ref_lat if req and req.ref_lat is not None else 28.6139
-    ref_lon = req.ref_lon if req and req.ref_lon is not None else 77.2090
+    # For live mode, we avoid hardcoded fallbacks. We use 0.0 to signal that the first GPS fix should anchor.
+    ref_lat = req.ref_lat if req and req.ref_lat is not None else 0.0
+    ref_lon = req.ref_lon if req and req.ref_lon is not None else 0.0
     if req and req.vehicle_type:
         engine.set_vehicle_type(req.vehicle_type)
     engine.reset(ref_lat=ref_lat, ref_lon=ref_lon)

@@ -109,8 +109,8 @@ class NavigationEngine:
 
     def __init__(
         self,
-        ref_lat: float = 28.6139,
-        ref_lon: float = 77.2090,
+        ref_lat: float = 0.0,
+        ref_lon: float = 0.0,
         vehicle_type: str = "two_wheeler",
         model_path: Optional[str] = None,
         dt: float = 0.1,
@@ -266,12 +266,10 @@ class NavigationEngine:
 
         # 2. Stationary / ZUPT Detection (with velocity-aware gating)
         # When physical GNSS speed is available and trusted, use it as speed gate.
-        # During GNSS outage / denied GNSS, do not feed uncorrected drifting EKF velocity into detector,
-        # otherwise high EKF velocity prevents StationaryDetector from latching rest upon stopping.
+        # AI speed is used for EKF updates but is not a reliable veto for stationary detection
+        # because it can suffer from bias/drift during blackout, creating a circular lockout.
         if gnss is not None and gnss.speed_mps is not None and np.isfinite(gnss.speed_mps) and getattr(self, 'has_physical_gps_fix', False):
             est_speed = float(gnss.speed_mps)
-        elif self.latest_ai_speed > 0.0 and self.ai_accepted_count > 0:
-            est_speed = float(self.latest_ai_speed)
         else:
             est_speed = None
         is_stationary = self.stationary_detector.update(acc_raw, gyro_raw, speed_mps=est_speed)
@@ -745,8 +743,9 @@ class NavigationEngine:
             "orientation_event_type": str(getattr(imu, 'orientation_event_type', '')),
             "R_p2v": R_p2v.tolist() if isinstance(R_p2v, np.ndarray) else R_p2v,
             "alignment_recalculated": bool(self.aligner.is_calibrated),
+            "acc_raw": acc_raw.tolist(),
             "acc_veh": [fwd_accel, lat_accel, vert_accel],
-            "gyro_veh": [roll_rate, pitch_rate, yaw_rate],
+            "g_body": g_body.tolist() if isinstance(g_body, np.ndarray) else list(g_body),
             "linear_acc": dyn_acc_body.tolist() if isinstance(dyn_acc_body, np.ndarray) else list(dyn_acc_body),
             "acc_magnitude": float(np.linalg.norm(acc_raw)),
             "stationary_variance": float(getattr(self.stationary_detector, 'latest_var', 0.0)),
@@ -755,6 +754,7 @@ class NavigationEngine:
             "ai_confidence_sigma": float(self.last_ai_sigma),
             "ai_innovation": float(np.atleast_1d(self.last_ai_update_metrics.get("innovation", 0.0))[0]) if (self.last_ai_update_metrics and "innovation" in self.last_ai_update_metrics) else None,
             "ai_accepted": bool(self.last_ai_update_metrics.get("accepted", False)) if self.last_ai_update_metrics else False,
+            "ekf_vel_before_ai": vel_before_ai.tolist(),
             "ekf_pos_enu": [float(pos_final[0]), float(pos_final[1]), float(pos_final[2])],
             "ekf_vel_enu": [float(vel_final[0]), float(vel_final[1]), float(vel_final[2])],
             "quat": [float(q_now[0]), float(q_now[1]), float(q_now[2]), float(q_now[3])],
@@ -769,6 +769,7 @@ class NavigationEngine:
             "nhc_accepted": bool(last_diag.get("accepted", False)) if last_diag.get("measurement") == "nhc" else False,
             "attitude_update_accepted": bool(last_diag.get("accepted", False)) if last_diag.get("measurement") == "attitude_3d" else False,
             "gnss_vel_update_accepted": bool(last_diag.get("accepted", False)) if last_diag.get("measurement") == "gnss_vel" else False,
+            "gnss_speed_mps": gnss.speed_mps if gnss else None,
             "self_healing_reanchored": bool(last_diag.get("reanchored", False)) if last_diag.get("measurement") == "ai_velocity" else False,
             "fwd_speed_kmh": round(cur_fwd_speed * 3.6, 2),
             "trajectory_point_accepted": True,
